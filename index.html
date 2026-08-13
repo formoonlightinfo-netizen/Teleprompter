@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<title>Teleprompter</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon.svg">
+<style>
+  :root{
+    --bg:#000;
+    --panel:#111214;
+    --panel-2:#1b1c1f;
+    --text:#f5f5f5;
+    --accent:#ffd21f;
+    --muted:#8a8d93;
+    --danger:#ff4d4f;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-left: env(safe-area-inset-left, 0px);
+    --safe-right: env(safe-area-inset-right, 0px);
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{
+    height:100%;
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    overscroll-behavior:none;
+    touch-action:manipulation;
+  }
+  #app{position:fixed; inset:0; overflow:hidden;}
+  .screen{position:absolute; inset:0; display:none;}
+  .screen.active{display:flex; flex-direction:column;}
+
+  /* ---------- SETUP SCREEN ---------- */
+  #setup-screen{
+    padding: calc(var(--safe-top) + 18px) calc(var(--safe-right) + 18px) calc(var(--safe-bottom) + 18px) calc(var(--safe-left) + 18px);
+    overflow-y:auto;
+    gap:16px;
+  }
+  .brand{
+    display:flex; align-items:center; gap:10px; margin-bottom:4px;
+  }
+  .brand .dot{width:12px;height:12px;border-radius:50%;background:var(--accent);}
+  .brand h1{font-size:20px; margin:0; font-weight:700; letter-spacing:.3px;}
+  .brand p{margin:2px 0 0; font-size:12.5px; color:var(--muted);}
+
+  textarea#script-input{
+    width:100%;
+    min-height:32vh;
+    resize:vertical;
+    background:var(--panel);
+    border:1px solid #2a2b2f;
+    border-radius:14px;
+    color:var(--text);
+    font-size:17px;
+    line-height:1.5;
+    padding:14px;
+    outline:none;
+  }
+  textarea#script-input:focus{border-color:var(--accent);}
+
+  .card{
+    background:var(--panel);
+    border:1px solid #2a2b2f;
+    border-radius:14px;
+    padding:14px;
+  }
+  .row{display:flex; align-items:center; justify-content:space-between; gap:10px;}
+  .row + .row{margin-top:14px;}
+  .row label{font-size:14px; color:#d7d8db; display:flex; flex-direction:column; gap:2px;}
+  .row label .val{font-size:12px; color:var(--accent); font-weight:600;}
+  input[type=range]{
+    flex:1; margin-left:14px; accent-color:var(--accent); height:34px;
+  }
+  .toggle-row{display:flex; gap:10px; flex-wrap:wrap;}
+  .toggle-btn{
+    flex:1; min-width:120px;
+    background:var(--panel-2);
+    border:1px solid #2a2b2f;
+    color:var(--muted);
+    padding:12px 10px;
+    border-radius:12px;
+    font-size:13.5px;
+    text-align:center;
+    cursor:pointer;
+    user-select:none;
+  }
+  .toggle-btn.on{
+    background:rgba(255,210,31,.12);
+    border-color:var(--accent);
+    color:var(--accent);
+    font-weight:600;
+  }
+
+  #start-btn{
+    margin-top:4px;
+    padding:16px;
+    border:none;
+    border-radius:14px;
+    background:var(--accent);
+    color:#161616;
+    font-size:17px;
+    font-weight:700;
+    cursor:pointer;
+  }
+  #start-btn:active{opacity:.85;}
+
+  .hint{font-size:11.5px; color:var(--muted); text-align:center; line-height:1.4;}
+
+  /* ---------- PROMPTER SCREEN ---------- */
+  #prompter-screen{background:#000;}
+  #reader{
+    flex:1;
+    overflow-y:scroll;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:none;
+  }
+  #reader::-webkit-scrollbar{display:none;}
+  #reader-inner{
+    padding: 60vh calc(var(--safe-right) + 6vw) 70vh calc(var(--safe-left) + 6vw);
+    transition: transform .15s ease;
+  }
+  #reader-inner.mirror-h{transform:scaleX(-1);}
+  #reader-inner.mirror-v{transform:scaleY(-1);}
+  #reader-inner.mirror-h.mirror-v{transform:scale(-1,-1);}
+
+  #prompter-text{
+    color:var(--text);
+    font-weight:600;
+    white-space:pre-wrap;
+    word-wrap:break-word;
+    text-align:center;
+  }
+
+  .center-line{
+    position:absolute;
+    left:0; right:0; top:50%;
+    height:0;
+    border-top:1.5px dashed rgba(255,210,31,.55);
+    pointer-events:none;
+    z-index:2;
+  }
+
+  #topbar{
+    position:absolute; top:0; left:0; right:0;
+    padding: calc(var(--safe-top) + 8px) calc(var(--safe-right) + 12px) 8px calc(var(--safe-left) + 12px);
+    display:flex; align-items:center; justify-content:space-between;
+    z-index:3;
+    background:linear-gradient(rgba(0,0,0,.65), transparent);
+    pointer-events:none;
+  }
+  #topbar > *{pointer-events:auto;}
+  .icon-btn{
+    width:40px; height:40px;
+    border-radius:50%;
+    border:1px solid rgba(255,255,255,.18);
+    background:rgba(20,20,20,.6);
+    color:var(--text);
+    display:flex; align-items:center; justify-content:center;
+    font-size:18px;
+    cursor:pointer;
+  }
+  #progress-wrap{
+    flex:1; margin:0 10px; height:4px; background:rgba(255,255,255,.15); border-radius:4px; overflow:hidden;
+  }
+  #progress-bar{height:100%; width:0%; background:var(--accent);}
+
+  #controls{
+    position:absolute; left:0; right:0; bottom:0;
+    padding: 10px calc(var(--safe-right) + 12px) calc(var(--safe-bottom) + 12px) calc(var(--safe-left) + 12px);
+    background:linear-gradient(transparent, rgba(0,0,0,.75) 40%);
+    z-index:3;
+    display:flex; flex-direction:column; gap:8px;
+  }
+  .ctrl-sliders{
+    display:flex; gap:10px;
+  }
+  .ctrl-slider{
+    flex:1;
+    background:rgba(20,20,20,.65);
+    border:1px solid rgba(255,255,255,.12);
+    border-radius:12px;
+    padding:6px 12px;
+    display:flex; align-items:center; gap:8px;
+  }
+  .ctrl-slider span.lbl{font-size:11px; color:var(--muted); width:34px;}
+  .ctrl-slider input[type=range]{margin:0;}
+  .ctrl-buttons{
+    display:flex; align-items:center; justify-content:center; gap:16px;
+  }
+  #play-btn{
+    width:64px; height:64px;
+    border-radius:50%;
+    background:var(--accent);
+    border:none;
+    color:#161616;
+    font-size:26px;
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
+  }
+  .side-btn{
+    width:46px; height:46px;
+    border-radius:50%;
+    background:rgba(20,20,20,.65);
+    border:1px solid rgba(255,255,255,.12);
+    color:var(--text);
+    font-size:16px;
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
+  }
+  .side-btn.active{border-color:var(--accent); color:var(--accent);}
+
+  #controls.hidden-ui{opacity:0; pointer-events:none;}
+  #topbar.hidden-ui{opacity:0; pointer-events:none;}
+
+  @media (orientation:landscape){
+    #reader-inner{padding-left:12vw; padding-right:12vw;}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ===================== SETUP SCREEN ===================== -->
+  <div id="setup-screen" class="screen active">
+    <div class="brand">
+      <div class="dot"></div>
+      <div>
+        <h1>Teleprompter</h1>
+        <p>Scrivi o incolla il testo, regola velocità e dimensione, poi avvia.</p>
+      </div>
+    </div>
+
+    <textarea id="script-input" placeholder="Incolla o scrivi qui il tuo testo..."></textarea>
+
+    <div class="card">
+      <div class="row">
+        <label>Velocità <span class="val" id="speed-val">5</span></label>
+        <input type="range" id="speed-range" min="1" max="20" step="1" value="5">
+      </div>
+      <div class="row">
+        <label>Grandezza testo <span class="val" id="size-val">42px</span></label>
+        <input type="range" id="size-range" min="18" max="120" step="1" value="42">
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="toggle-row">
+        <div class="toggle-btn" id="toggle-mirror-h">Specchio orizzontale</div>
+        <div class="toggle-btn" id="toggle-mirror-v">Specchio verticale</div>
+      </div>
+    </div>
+
+    <button id="start-btn">Avvia Teleprompter</button>
+    <p class="hint">Suggerimento: ruota il telefono in orizzontale o verticale in qualsiasi momento, il testo si adatta automaticamente. Durante la lettura lo schermo resta acceso.</p>
+  </div>
+
+  <!-- ===================== PROMPTER SCREEN ===================== -->
+  <div id="prompter-screen" class="screen">
+    <div id="reader">
+      <div id="reader-inner">
+        <div id="prompter-text"></div>
+      </div>
+    </div>
+    <div class="center-line"></div>
+
+    <div id="topbar">
+      <button class="icon-btn" id="exit-btn" title="Esci">✕</button>
+      <div id="progress-wrap"><div id="progress-bar"></div></div>
+      <button class="icon-btn" id="restart-btn" title="Riavvia">↺</button>
+    </div>
+
+    <div id="controls">
+      <div class="ctrl-sliders">
+        <div class="ctrl-slider">
+          <span class="lbl">Vel.</span>
+          <input type="range" id="live-speed" min="1" max="20" step="1" value="5">
+        </div>
+        <div class="ctrl-slider">
+          <span class="lbl">Testo</span>
+          <input type="range" id="live-size" min="18" max="120" step="1" value="42">
+        </div>
+      </div>
+      <div class="ctrl-buttons">
+        <button class="side-btn" id="mirror-h-btn" title="Specchio orizzontale">⇋</button>
+        <button class="side-btn" id="fullscreen-btn" title="Schermo intero">⛶</button>
+        <button id="play-btn" title="Play/Pausa">▶</button>
+        <button class="side-btn" id="mirror-v-btn" title="Specchio verticale">⇵</button>
+        <button class="side-btn" id="hide-ui-btn" title="Nascondi controlli">👁</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+
+  const setupScreen = $('setup-screen');
+  const prompterScreen = $('prompter-screen');
+  const scriptInput = $('script-input');
+  const speedRange = $('speed-range');
+  const sizeRange = $('size-range');
+  const speedVal = $('speed-val');
+  const sizeVal = $('size-val');
+  const toggleMirrorH = $('toggle-mirror-h');
+  const toggleMirrorV = $('toggle-mirror-v');
+  const startBtn = $('start-btn');
+
+  const reader = $('reader');
+  const readerInner = $('reader-inner');
+  const promptText = $('prompter-text');
+  const liveSpeed = $('live-speed');
+  const liveSize = $('live-size');
+  const playBtn = $('play-btn');
+  const restartBtn = $('restart-btn');
+  const exitBtn = $('exit-btn');
+  const mirrorHBtn = $('mirror-h-btn');
+  const mirrorVBtn = $('mirror-v-btn');
+  const fullscreenBtn = $('fullscreen-btn');
+  const hideUiBtn = $('hide-ui-btn');
+  const controls = $('controls');
+  const topbar = $('topbar');
+  const progressBar = $('progress-bar');
+
+  const state = {
+    speed: 5,
+    size: 42,
+    mirrorH: false,
+    mirrorV: false,
+    playing: false,
+    uiHidden: false,
+  };
+
+  // ---------- persistence ----------
+  const STORAGE_KEY = 'teleprompter-settings-v1';
+  function loadSettings(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if(!raw) return;
+      const s = JSON.parse(raw);
+      if(s.speed) state.speed = s.speed;
+      if(s.size) state.size = s.size;
+      if(typeof s.mirrorH === 'boolean') state.mirrorH = s.mirrorH;
+      if(typeof s.mirrorV === 'boolean') state.mirrorV = s.mirrorV;
+      if(typeof s.text === 'string') scriptInput.value = s.text;
+    }catch(e){}
+  }
+  function saveSettings(){
+    try{
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        speed: state.speed, size: state.size,
+        mirrorH: state.mirrorH, mirrorV: state.mirrorV,
+        text: scriptInput.value
+      }));
+    }catch(e){}
+  }
+
+  function syncUI(){
+    speedRange.value = state.speed;
+    liveSpeed.value = state.speed;
+    speedVal.textContent = state.speed;
+    sizeRange.value = state.size;
+    liveSize.value = state.size;
+    sizeVal.textContent = state.size + 'px';
+    promptText.style.fontSize = state.size + 'px';
+    toggleMirrorH.classList.toggle('on', state.mirrorH);
+    toggleMirrorV.classList.toggle('on', state.mirrorV);
+    mirrorHBtn.classList.toggle('active', state.mirrorH);
+    mirrorVBtn.classList.toggle('active', state.mirrorV);
+    readerInner.classList.toggle('mirror-h', state.mirrorH);
+    readerInner.classList.toggle('mirror-v', state.mirrorV);
+  }
+
+  loadSettings();
+  syncUI();
+
+  // ---------- setup screen interactions ----------
+  speedRange.addEventListener('input', () => { state.speed = +speedRange.value; syncUI(); saveSettings(); });
+  sizeRange.addEventListener('input', () => { state.size = +sizeRange.value; syncUI(); saveSettings(); });
+  toggleMirrorH.addEventListener('click', () => { state.mirrorH = !state.mirrorH; syncUI(); saveSettings(); });
+  toggleMirrorV.addEventListener('click', () => { state.mirrorV = !state.mirrorV; syncUI(); saveSettings(); });
+  scriptInput.addEventListener('change', saveSettings);
+
+  // ---------- live control screen interactions ----------
+  liveSpeed.addEventListener('input', () => { state.speed = +liveSpeed.value; syncUI(); saveSettings(); });
+  liveSize.addEventListener('input', () => { state.size = +liveSize.value; syncUI(); saveSettings(); });
+  mirrorHBtn.addEventListener('click', () => { state.mirrorH = !state.mirrorH; syncUI(); saveSettings(); });
+  mirrorVBtn.addEventListener('click', () => { state.mirrorV = !state.mirrorV; syncUI(); saveSettings(); });
+
+  // ---------- wake lock ----------
+  let wakeLock = null;
+  async function requestWakeLock(){
+    try{
+      if('wakeLock' in navigator){
+        wakeLock = await navigator.wakeLock.request('screen');
+      }
+    }catch(e){ /* ignore, not critical */ }
+  }
+  function releaseWakeLock(){
+    if(wakeLock){ wakeLock.release().catch(()=>{}); wakeLock = null; }
+  }
+  document.addEventListener('visibilitychange', () => {
+    if(document.visibilityState === 'visible' && state.playing) requestWakeLock();
+  });
+
+  // ---------- fullscreen ----------
+  function toggleFullscreen(){
+    if(!document.fullscreenElement){
+      document.documentElement.requestFullscreen?.().catch(()=>{});
+    } else {
+      document.exitFullscreen?.().catch(()=>{});
+    }
+  }
+  fullscreenBtn.addEventListener('click', toggleFullscreen);
+
+  // ---------- scrolling engine ----------
+  let rafId = null;
+  let lastTs = null;
+  // pixel/second baseline; speed 1..20 maps roughly 12..300 px/s
+  function speedToPxPerSec(sp){
+    return 10 + (sp * sp) * 0.8;
+  }
+
+  function step(ts){
+    if(!state.playing){ rafId = null; return; }
+    if(lastTs === null) lastTs = ts;
+    const dt = (ts - lastTs) / 1000;
+    lastTs = ts;
+    const pxPerSec = speedToPxPerSec(state.speed);
+    reader.scrollTop += pxPerSec * dt;
+    updateProgress();
+    if(reader.scrollTop + reader.clientHeight >= reader.scrollHeight - 2){
+      pause();
+      return;
+    }
+    rafId = requestAnimationFrame(step);
+  }
+
+  function updateProgress(){
+    const max = reader.scrollHeight - reader.clientHeight;
+    const pct = max > 0 ? Math.min(100, (reader.scrollTop / max) * 100) : 0;
+    progressBar.style.width = pct + '%';
+  }
+
+  function play(){
+    if(state.playing) return;
+    state.playing = true;
+    playBtn.textContent = '❚❚';
+    lastTs = null;
+    requestWakeLock();
+    rafId = requestAnimationFrame(step);
+  }
+  function pause(){
+    state.playing = false;
+    playBtn.textContent = '▶';
+    if(rafId) cancelAnimationFrame(rafId);
+    rafId = null;
+    releaseWakeLock();
+  }
+  function togglePlay(){ state.playing ? pause() : play(); }
+  playBtn.addEventListener('click', togglePlay);
+
+  restartBtn.addEventListener('click', () => {
+    pause();
+    reader.scrollTop = 0;
+    updateProgress();
+  });
+
+  // tap on text area toggles play/pause too
+  reader.addEventListener('click', (e) => {
+    togglePlay();
+  });
+
+  // manual scroll (drag) should sync progress bar
+  reader.addEventListener('scroll', updateProgress);
+
+  // ---------- hide/show UI ----------
+  hideUiBtn.addEventListener('click', () => {
+    state.uiHidden = !state.uiHidden;
+    controls.classList.toggle('hidden-ui', state.uiHidden);
+    topbar.classList.toggle('hidden-ui', state.uiHidden);
+  });
+
+  // ---------- start / exit ----------
+  function startPrompter(){
+    const text = scriptInput.value.trim();
+    promptText.textContent = text.length ? text : 'Nessun testo inserito.\n\nTorna indietro e scrivi il tuo copione.';
+    syncUI();
+    saveSettings();
+    setupScreen.classList.remove('active');
+    prompterScreen.classList.add('active');
+    reader.scrollTop = 0;
+    updateProgress();
+    pause();
+  }
+
+  function exitPrompter(){
+    pause();
+    prompterScreen.classList.remove('active');
+    setupScreen.classList.add('active');
+    if(document.fullscreenElement) document.exitFullscreen?.().catch(()=>{});
+  }
+
+  startBtn.addEventListener('click', startPrompter);
+  exitBtn.addEventListener('click', exitPrompter);
+
+  // ---------- keyboard shortcuts (useful with bluetooth remote / external keyboard) ----------
+  document.addEventListener('keydown', (e) => {
+    if(!prompterScreen.classList.contains('active')) return;
+    if(e.code === 'Space'){ e.preventDefault(); togglePlay(); }
+    else if(e.code === 'ArrowUp'){ state.speed = Math.min(20, state.speed+1); syncUI(); }
+    else if(e.code === 'ArrowDown'){ state.speed = Math.max(1, state.speed-1); syncUI(); }
+    else if(e.code === 'Escape'){ exitPrompter(); }
+  });
+
+  // ---------- orientation change: keep scroll position stable ----------
+  window.addEventListener('resize', updateProgress);
+
+  // ---------- register service worker (offline / installable) ----------
+  if('serviceWorker' in navigator){
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch(()=>{});
+    });
+  }
+})();
+</script>
+</body>
+</html>
