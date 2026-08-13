@@ -138,7 +138,49 @@
     white-space:pre-wrap;
     word-wrap:break-word;
     text-align:center;
+    text-shadow: 0 2px 8px rgba(0,0,0,.9), 0 0 18px rgba(0,0,0,.75);
   }
+
+  /* ---------- CAMERA MODE ---------- */
+  #camera-video{
+    position:absolute; inset:0;
+    width:100%; height:100%;
+    object-fit:cover;
+    background:#000;
+    display:none;
+    z-index:0;
+  }
+  #camera-video.mirror-preview{transform:scaleX(-1);}
+  .camera-dim{
+    position:absolute; inset:0;
+    background:rgba(0,0,0,.32);
+    display:none;
+    pointer-events:none;
+    z-index:1;
+  }
+  #prompter-screen.camera-mode #camera-video,
+  #prompter-screen.camera-mode .camera-dim{display:block;}
+  #prompter-screen.camera-mode #reader{background:transparent; position:relative; z-index:1;}
+  #prompter-screen:not(.camera-mode) #camera-video,
+  #prompter-screen:not(.camera-mode) .camera-dim{display:none;}
+
+  #rec-indicator{
+    display:none;
+    align-items:center; gap:6px;
+    background:rgba(0,0,0,.6);
+    border:1px solid rgba(255,77,79,.6);
+    border-radius:20px;
+    padding:6px 12px;
+    font-size:13px;
+    font-weight:600;
+    color:#fff;
+  }
+  #rec-indicator.on{display:flex;}
+  #rec-indicator .rec-dot{
+    width:9px; height:9px; border-radius:50%; background:var(--danger);
+    animation: rec-pulse 1s infinite;
+  }
+  @keyframes rec-pulse{ 0%,100%{opacity:1;} 50%{opacity:.25;} }
 
   .center-line{
     position:absolute;
@@ -194,7 +236,7 @@
   .ctrl-slider span.lbl{font-size:11px; color:var(--muted); width:34px;}
   .ctrl-slider input[type=range]{margin:0;}
   .ctrl-buttons{
-    display:flex; align-items:center; justify-content:center; gap:16px;
+    display:flex; align-items:center; justify-content:center; gap:12px; row-gap:10px; flex-wrap:wrap;
   }
   #play-btn{
     width:64px; height:64px;
@@ -217,6 +259,20 @@
     cursor:pointer;
   }
   .side-btn.active{border-color:var(--accent); color:var(--accent);}
+  .side-btn:disabled{opacity:.35; cursor:default;}
+
+  #play-btn.rec-mode{background:var(--danger); color:#fff;}
+  #play-btn.rec-mode.recording{border-radius:18px;}
+
+  .segmented{display:flex; gap:8px; margin-top:10px;}
+  .segmented .seg-btn{
+    flex:1; text-align:center; padding:10px 8px; border-radius:10px;
+    background:var(--panel-2); border:1px solid #2a2b2f; color:var(--muted);
+    font-size:13px; cursor:pointer; user-select:none;
+  }
+  .segmented .seg-btn.on{background:rgba(255,210,31,.12); border-color:var(--accent); color:var(--accent); font-weight:600;}
+  .card .subnote{font-size:11.5px; color:var(--muted); margin-top:10px; line-height:1.4;}
+  .card[hidden]{display:none;}
 
   #controls.hidden-ui{opacity:0; pointer-events:none;}
   #topbar.hidden-ui{opacity:0; pointer-events:none;}
@@ -257,6 +313,18 @@
         <div class="toggle-btn" id="toggle-mirror-h">Specchio orizzontale</div>
         <div class="toggle-btn" id="toggle-mirror-v">Specchio verticale</div>
       </div>
+      <p class="subnote">Lo specchio serve solo se usi un vetro da teleprompter fisico. Se registri con la fotocamera del telefono lascialo spento.</p>
+    </div>
+
+    <div class="card">
+      <div class="toggle-row">
+        <div class="toggle-btn" id="toggle-camera">📷 Registra con la fotocamera</div>
+      </div>
+      <div class="segmented" id="facing-mode-row" hidden>
+        <div class="seg-btn on" id="facing-user">Anteriore (selfie)</div>
+        <div class="seg-btn" id="facing-environment">Posteriore</div>
+      </div>
+      <p class="subnote">Il testo resta solo sullo schermo per aiutarti a leggere: nel video registrato si vedono solo tu e l'audio, non il testo. Il telefono chiederà il permesso di usare fotocamera e microfono.</p>
     </div>
 
     <button id="start-btn">Avvia Teleprompter</button>
@@ -265,6 +333,8 @@
 
   <!-- ===================== PROMPTER SCREEN ===================== -->
   <div id="prompter-screen" class="screen">
+    <video id="camera-video" playsinline autoplay muted></video>
+    <div class="camera-dim"></div>
     <div id="reader">
       <div id="reader-inner">
         <div id="prompter-text"></div>
@@ -274,6 +344,7 @@
 
     <div id="topbar">
       <button class="icon-btn" id="exit-btn" title="Esci">✕</button>
+      <div id="rec-indicator"><span class="rec-dot"></span><span id="rec-time">00:00</span></div>
       <div id="progress-wrap"><div id="progress-bar"></div></div>
       <button class="icon-btn" id="restart-btn" title="Riavvia">↺</button>
     </div>
@@ -291,9 +362,10 @@
       </div>
       <div class="ctrl-buttons">
         <button class="side-btn" id="mirror-h-btn" title="Specchio orizzontale">⇋</button>
-        <button class="side-btn" id="fullscreen-btn" title="Schermo intero">⛶</button>
-        <button id="play-btn" title="Play/Pausa">▶</button>
         <button class="side-btn" id="mirror-v-btn" title="Specchio verticale">⇵</button>
+        <button class="side-btn" id="switch-camera-btn" title="Cambia fotocamera" hidden>🔄</button>
+        <button id="play-btn" title="Play/Pausa">▶</button>
+        <button class="side-btn" id="fullscreen-btn" title="Schermo intero">⛶</button>
         <button class="side-btn" id="hide-ui-btn" title="Nascondi controlli">👁</button>
       </div>
     </div>
@@ -314,6 +386,10 @@
   const sizeVal = $('size-val');
   const toggleMirrorH = $('toggle-mirror-h');
   const toggleMirrorV = $('toggle-mirror-v');
+  const toggleCamera = $('toggle-camera');
+  const facingModeRow = $('facing-mode-row');
+  const facingUserBtn = $('facing-user');
+  const facingEnvBtn = $('facing-environment');
   const startBtn = $('start-btn');
 
   const reader = $('reader');
@@ -331,6 +407,10 @@
   const controls = $('controls');
   const topbar = $('topbar');
   const progressBar = $('progress-bar');
+  const cameraVideo = $('camera-video');
+  const switchCameraBtn = $('switch-camera-btn');
+  const recIndicator = $('rec-indicator');
+  const recTimeEl = $('rec-time');
 
   const state = {
     speed: 5,
@@ -339,6 +419,9 @@
     mirrorV: false,
     playing: false,
     uiHidden: false,
+    cameraOn: false,
+    facingMode: 'user',
+    recording: false,
   };
 
   // ---------- persistence ----------
@@ -352,6 +435,8 @@
       if(s.size) state.size = s.size;
       if(typeof s.mirrorH === 'boolean') state.mirrorH = s.mirrorH;
       if(typeof s.mirrorV === 'boolean') state.mirrorV = s.mirrorV;
+      if(typeof s.cameraOn === 'boolean') state.cameraOn = s.cameraOn;
+      if(s.facingMode) state.facingMode = s.facingMode;
       if(typeof s.text === 'string') scriptInput.value = s.text;
     }catch(e){}
   }
@@ -360,6 +445,7 @@
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
         speed: state.speed, size: state.size,
         mirrorH: state.mirrorH, mirrorV: state.mirrorV,
+        cameraOn: state.cameraOn, facingMode: state.facingMode,
         text: scriptInput.value
       }));
     }catch(e){}
@@ -379,6 +465,14 @@
     mirrorVBtn.classList.toggle('active', state.mirrorV);
     readerInner.classList.toggle('mirror-h', state.mirrorH);
     readerInner.classList.toggle('mirror-v', state.mirrorV);
+
+    toggleCamera.classList.toggle('on', state.cameraOn);
+    facingModeRow.hidden = !state.cameraOn;
+    facingUserBtn.classList.toggle('on', state.facingMode === 'user');
+    facingEnvBtn.classList.toggle('on', state.facingMode === 'environment');
+    switchCameraBtn.hidden = !state.cameraOn;
+    playBtn.classList.toggle('rec-mode', state.cameraOn);
+    updateMainButtonIcon();
   }
 
   loadSettings();
@@ -389,6 +483,9 @@
   sizeRange.addEventListener('input', () => { state.size = +sizeRange.value; syncUI(); saveSettings(); });
   toggleMirrorH.addEventListener('click', () => { state.mirrorH = !state.mirrorH; syncUI(); saveSettings(); });
   toggleMirrorV.addEventListener('click', () => { state.mirrorV = !state.mirrorV; syncUI(); saveSettings(); });
+  toggleCamera.addEventListener('click', () => { state.cameraOn = !state.cameraOn; syncUI(); saveSettings(); });
+  facingUserBtn.addEventListener('click', () => { state.facingMode = 'user'; syncUI(); saveSettings(); });
+  facingEnvBtn.addEventListener('click', () => { state.facingMode = 'environment'; syncUI(); saveSettings(); });
   scriptInput.addEventListener('change', saveSettings);
 
   // ---------- live control screen interactions ----------
@@ -423,6 +520,134 @@
   }
   fullscreenBtn.addEventListener('click', toggleFullscreen);
 
+  // ---------- camera + recording ----------
+  let cameraStream = null;
+  let mediaRecorder = null;
+  let recordedChunks = [];
+  let recStartTs = null;
+  let recTimerId = null;
+
+  async function startCamera(){
+    stopCameraStream();
+    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+      alert('Questo browser non supporta la fotocamera dal web. Prova con Chrome o Safari aggiornati.');
+      state.cameraOn = false; syncUI(); saveSettings();
+      return false;
+    }
+    try{
+      cameraStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: state.facingMode },
+        audio: true
+      });
+      cameraVideo.srcObject = cameraStream;
+      cameraVideo.classList.toggle('mirror-preview', state.facingMode === 'user');
+      return true;
+    }catch(e){
+      alert('Impossibile accedere alla fotocamera o al microfono. Controlla i permessi del browser per questo sito.');
+      state.cameraOn = false; syncUI(); saveSettings();
+      return false;
+    }
+  }
+
+  function stopCameraStream(){
+    if(cameraStream){
+      cameraStream.getTracks().forEach((t) => t.stop());
+      cameraStream = null;
+    }
+    cameraVideo.srcObject = null;
+  }
+
+  switchCameraBtn.addEventListener('click', async () => {
+    if(state.recording) return;
+    state.facingMode = state.facingMode === 'user' ? 'environment' : 'user';
+    syncUI(); saveSettings();
+    await startCamera();
+  });
+
+  function pickMimeType(){
+    if(!window.MediaRecorder) return '';
+    const candidates = [
+      'video/mp4;codecs=h264,aac',
+      'video/mp4',
+      'video/webm;codecs=vp9,opus',
+      'video/webm;codecs=vp8,opus',
+      'video/webm'
+    ];
+    for(const c of candidates){
+      if(MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(c)) return c;
+    }
+    return '';
+  }
+
+  function formatTime(sec){
+    const m = Math.floor(sec / 60).toString().padStart(2,'0');
+    const s = Math.floor(sec % 60).toString().padStart(2,'0');
+    return m + ':' + s;
+  }
+
+  function updateRecTimer(){
+    const elapsed = (Date.now() - recStartTs) / 1000;
+    recTimeEl.textContent = formatTime(elapsed);
+  }
+
+  function startRecording(){
+    if(!cameraStream || !window.MediaRecorder) return;
+    recordedChunks = [];
+    const mimeType = pickMimeType();
+    try{
+      mediaRecorder = mimeType ? new MediaRecorder(cameraStream, { mimeType }) : new MediaRecorder(cameraStream);
+    }catch(e){
+      alert('La registrazione video non è supportata su questo browser.');
+      return;
+    }
+    mediaRecorder.ondataavailable = (e) => { if(e.data && e.data.size > 0) recordedChunks.push(e.data); };
+    mediaRecorder.onstop = handleRecordingStop;
+    mediaRecorder.start();
+    state.recording = true;
+    recIndicator.classList.add('on');
+    playBtn.classList.add('recording');
+    updateMainButtonIcon();
+    recStartTs = Date.now();
+    recTimeEl.textContent = '00:00';
+    recTimerId = setInterval(updateRecTimer, 250);
+    switchCameraBtn.disabled = true;
+  }
+
+  function stopRecording(){
+    if(mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+    state.recording = false;
+    recIndicator.classList.remove('on');
+    playBtn.classList.remove('recording');
+    updateMainButtonIcon();
+    clearInterval(recTimerId);
+    switchCameraBtn.disabled = false;
+  }
+
+  async function handleRecordingStop(){
+    if(recordedChunks.length === 0) return;
+    const mimeType = (mediaRecorder && mediaRecorder.mimeType) || 'video/webm';
+    const blob = new Blob(recordedChunks, { type: mimeType });
+    const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
+    const filename = `teleprompter-${Date.now()}.${ext}`;
+
+    let shared = false;
+    try{
+      const file = new File([blob], filename, { type: mimeType });
+      if(navigator.canShare && navigator.canShare({ files: [file] })){
+        await navigator.share({ files: [file], title: 'Video Teleprompter' });
+        shared = true;
+      }
+    }catch(e){ /* user cancelled share sheet, fall back to download */ }
+
+    if(!shared){
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    }
+  }
+
   // ---------- scrolling engine ----------
   let rafId = null;
   let lastTs = null;
@@ -452,23 +677,42 @@
     progressBar.style.width = pct + '%';
   }
 
+  function updateMainButtonIcon(){
+    if(state.cameraOn){
+      playBtn.textContent = state.recording ? '⏹' : '⏺';
+    } else {
+      playBtn.textContent = state.playing ? '❚❚' : '▶';
+    }
+  }
+
   function play(){
     if(state.playing) return;
     state.playing = true;
-    playBtn.textContent = '❚❚';
+    updateMainButtonIcon();
     lastTs = null;
     requestWakeLock();
     rafId = requestAnimationFrame(step);
   }
   function pause(){
     state.playing = false;
-    playBtn.textContent = '▶';
+    updateMainButtonIcon();
     if(rafId) cancelAnimationFrame(rafId);
     rafId = null;
     releaseWakeLock();
   }
   function togglePlay(){ state.playing ? pause() : play(); }
-  playBtn.addEventListener('click', togglePlay);
+
+  function handleMainButton(){
+    if(!state.cameraOn){ togglePlay(); return; }
+    if(!state.recording){
+      startRecording();
+      if(!state.playing) play();
+    } else {
+      stopRecording();
+      pause();
+    }
+  }
+  playBtn.addEventListener('click', handleMainButton);
 
   restartBtn.addEventListener('click', () => {
     pause();
@@ -492,7 +736,7 @@
   });
 
   // ---------- start / exit ----------
-  function startPrompter(){
+  async function startPrompter(){
     const text = scriptInput.value.trim();
     promptText.textContent = text.length ? text : 'Nessun testo inserito.\n\nTorna indietro e scrivi il tuo copione.';
     syncUI();
@@ -502,10 +746,20 @@
     reader.scrollTop = 0;
     updateProgress();
     pause();
+
+    prompterScreen.classList.toggle('camera-mode', state.cameraOn);
+    if(state.cameraOn){
+      const ok = await startCamera();
+      prompterScreen.classList.toggle('camera-mode', state.cameraOn && ok);
+      syncUI();
+    }
   }
 
   function exitPrompter(){
+    if(state.recording) stopRecording();
     pause();
+    stopCameraStream();
+    prompterScreen.classList.remove('camera-mode');
     prompterScreen.classList.remove('active');
     setupScreen.classList.add('active');
     if(document.fullscreenElement) document.exitFullscreen?.().catch(()=>{});
