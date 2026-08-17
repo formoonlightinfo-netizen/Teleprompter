@@ -35,169 +35,75 @@
     overscroll-behavior:none;
     touch-action:manipulation;
   }
-  #app{position:fixed; inset:0; overflow:hidden;}
-  .screen{position:absolute; inset:0; display:none;}
-  .screen.active{display:flex; flex-direction:column;}
+  #app{position:fixed; inset:0; overflow:hidden; background:#000;}
 
-  /* ---------- SETUP SCREEN ---------- */
-  #setup-screen{
-    padding: calc(var(--safe-top) + 18px) calc(var(--safe-right) + 18px) calc(var(--safe-bottom) + 18px) calc(var(--safe-left) + 18px);
-    overflow-y:auto;
-    gap:16px;
+  /* ---------- CAMERA BACKGROUND ---------- */
+  #camera-video{
+    position:absolute; inset:0;
+    width:100%; height:100%;
+    object-fit:cover;
+    background:#000;
+    transform:scale(var(--zoom, 0.85));
+    z-index:0;
   }
-  .brand{
-    display:flex; align-items:center; gap:10px; margin-bottom:4px;
-  }
-  .brand .dot{width:12px;height:12px;border-radius:50%;background:var(--accent);}
-  .brand h1{font-size:20px; margin:0; font-weight:700; letter-spacing:.3px;}
-  .brand p{margin:2px 0 0; font-size:12.5px; color:var(--muted);}
-
-  textarea#script-input{
-    width:100%;
-    min-height:32vh;
-    resize:vertical;
-    background:var(--panel);
-    border:1px solid #2a2b2f;
-    border-radius:14px;
-    color:var(--text);
-    font-size:17px;
-    line-height:1.5;
-    padding:14px;
-    outline:none;
-  }
-  textarea#script-input:focus{border-color:var(--accent);}
-
-  .card{
-    background:var(--panel);
-    border:1px solid #2a2b2f;
-    border-radius:14px;
-    padding:14px;
-  }
-  .row{display:flex; align-items:center; justify-content:space-between; gap:10px;}
-  .row + .row{margin-top:14px;}
-  .row label{font-size:14px; color:#d7d8db; display:flex; flex-direction:column; gap:2px;}
-  .row label .val{font-size:12px; color:var(--accent); font-weight:600;}
-  input[type=range]{
-    flex:1; margin-left:14px; accent-color:var(--accent); height:34px;
-  }
-  .toggle-row{display:flex; gap:10px; flex-wrap:wrap;}
-  .toggle-btn{
-    flex:1; min-width:120px;
-    background:var(--panel-2);
-    border:1px solid #2a2b2f;
-    color:var(--muted);
-    padding:12px 10px;
-    border-radius:12px;
-    font-size:13.5px;
-    text-align:center;
-    cursor:pointer;
-    user-select:none;
-  }
-  .toggle-btn.on{
-    background:rgba(255,210,31,.12);
-    border-color:var(--accent);
-    color:var(--accent);
-    font-weight:600;
+  #camera-video.mirror-preview{transform:scaleX(-1) scale(var(--zoom, 0.85));}
+  .camera-dim{
+    position:absolute; inset:0;
+    background:rgba(0,0,0,.1);
+    pointer-events:none;
+    z-index:1;
   }
 
-  #start-btn{
-    margin-top:4px;
-    padding:16px;
-    border:none;
-    border-radius:14px;
-    background:var(--accent);
-    color:#161616;
-    font-size:17px;
-    font-weight:700;
-    cursor:pointer;
-  }
-  #start-btn:active{opacity:.85;}
-
-  .hint{font-size:11.5px; color:var(--muted); text-align:center; line-height:1.4;}
-
-  /* ---------- PROMPTER SCREEN ---------- */
-  #prompter-screen{background:#000;}
+  /* ---------- floating, draggable, resizable prompter box ---------- */
   #reader{
-    flex:1;
-    overflow-y:scroll;
+    position:absolute;
+    top:12%; left:6%; right:6%; bottom:auto;
+    height:26vh; min-height:90px; max-height:80vh;
+    min-width:160px; max-width:92vw;
+    background:rgba(15,15,17,.62);
+    border-radius:18px;
+    border:1px solid rgba(255,255,255,.14);
+    box-shadow:0 8px 24px rgba(0,0,0,.35);
+    z-index:2;
+    overflow-y:auto;
     -webkit-overflow-scrolling:touch;
     scrollbar-width:none;
+    touch-action:pan-y;
   }
   #reader::-webkit-scrollbar{display:none;}
-  #reader-inner{
-    padding: 60vh calc(var(--safe-right) + 6vw) 70vh calc(var(--safe-left) + 6vw);
-    transition: transform .15s ease;
-  }
-  #reader-inner.mirror-h{transform:scaleX(-1);}
-  #reader-inner.mirror-v{transform:scaleY(-1);}
-  #reader-inner.mirror-h.mirror-v{transform:scale(-1,-1);}
+  #reader.box-collapsed{ height:34px; overflow:hidden; }
+
+  #reader-inner{ padding:34px 16px 18px; }
 
   #prompter-text{
     color:var(--text);
     font-weight:600;
     white-space:pre-wrap;
     word-wrap:break-word;
-    text-align:center;
+    text-align:left;
+    outline:none;
+    min-height:1.4em;
     text-shadow: 0 2px 8px rgba(0,0,0,.9), 0 0 18px rgba(0,0,0,.75);
   }
-
-  /* ---------- CAMERA MODE ---------- */
-  #camera-video{
-    position:absolute; inset:0;
-    width:100%; height:100%;
-    object-fit:cover;
-    background:#000;
-    display:none;
-    z-index:0;
+  #prompter-text:empty:before{
+    content:"Tocca qui e scrivi il tuo testo...";
+    color:rgba(255,255,255,.45);
+    font-weight:500;
   }
-  #camera-video.mirror-preview{transform:scaleX(-1);}
-  .camera-dim{
-    position:absolute; inset:0;
-    background:rgba(0,0,0,.08);
-    display:none;
-    pointer-events:none;
-    z-index:1;
+  #prompter-text[contenteditable="true"]{
+    -webkit-user-select:text; user-select:text;
   }
-  #prompter-screen.camera-mode #camera-video,
-  #prompter-screen.camera-mode .camera-dim{display:block;}
-  #prompter-screen:not(.camera-mode) #camera-video,
-  #prompter-screen:not(.camera-mode) .camera-dim{display:none;}
-
-  /* floating, draggable prompter box (camera mode only) */
-  #prompter-screen.camera-mode #reader{
-    position:absolute;
-    top:12%; left:6%; right:6%; bottom:auto;
-    height:28vh; max-height:46vh;
-    flex:none;
-    background:rgba(15,15,17,.62);
-    border-radius:18px;
-    border:1px solid rgba(255,255,255,.14);
-    box-shadow:0 8px 24px rgba(0,0,0,.35);
-    z-index:2;
-    touch-action:pan-y;
-  }
-  #prompter-screen.camera-mode #reader-inner{
-    padding:34px 16px 16px;
-  }
-  #prompter-screen.camera-mode #prompter-text{
-    text-align:left;
-  }
-  #prompter-screen.camera-mode #reader.box-collapsed{
-    height:34px; overflow:hidden;
-  }
-  #prompter-screen.camera-mode .center-line{ display:none; }
 
   #box-header{
-    display:none;
     position:absolute; top:0; left:0; right:0; height:32px;
-    align-items:center; justify-content:space-between; gap:8px;
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
     padding:4px 8px;
     z-index:3;
     cursor:grab;
+    touch-action:none;
     background:linear-gradient(rgba(0,0,0,.28), transparent);
     border-radius:18px 18px 0 0;
   }
-  #prompter-screen.camera-mode #box-header{ display:flex; }
   #box-header .drag-grip{
     flex:1; height:4px; background:rgba(255,255,255,.5); border-radius:4px;
   }
@@ -207,82 +113,20 @@
     display:flex; align-items:center; justify-content:center; cursor:pointer;
   }
 
-  #camera-bar{
-    display:none;
-    position:absolute; left:0; right:0; bottom:0;
-    padding:14px calc(var(--safe-right) + 28px) calc(var(--safe-bottom) + 20px) calc(var(--safe-left) + 28px);
-    align-items:center; justify-content:space-between;
-    z-index:3;
-    background:linear-gradient(transparent, rgba(0,0,0,.6) 55%);
+  #resize-handle{
+    position:absolute; right:2px; bottom:2px; width:26px; height:26px;
+    z-index:3; cursor:nwse-resize; touch-action:none;
+    display:flex; align-items:flex-end; justify-content:flex-end;
+    padding:4px;
   }
-  #prompter-screen.camera-mode #camera-bar{ display:flex; }
-  #prompter-screen.camera-mode #controls{ display:none; }
+  #resize-handle svg{ width:14px; height:14px; opacity:.6; }
 
-  #cam-record-btn{
-    width:72px; height:72px; border-radius:50%;
-    background:var(--danger); border:4px solid #fff;
-    display:flex; align-items:center; justify-content:center;
-    cursor:pointer;
-  }
-  #cam-record-btn .dot{ width:26px; height:26px; border-radius:50%; background:#fff; transition:border-radius .15s ease, width .15s ease, height .15s ease; }
-  #cam-record-btn.recording .dot{ border-radius:6px; width:22px; height:22px; }
-
-  .cam-side-btn{
-    width:48px; height:48px; border-radius:50%;
-    background:rgba(20,20,20,.55); border:1px solid rgba(255,255,255,.18);
-    color:#fff; font-size:18px;
-    display:flex; align-items:center; justify-content:center;
-    cursor:pointer;
-  }
-  .cam-side-btn:disabled{ opacity:.35; }
-  .cam-side-btn-spacer{ width:48px; }
-
-  #settings-popover{
-    display:none;
-    position:absolute;
-    left:50%; bottom:calc(var(--safe-bottom) + 108px);
-    transform:translateX(-50%);
-    z-index:4;
-    background:rgba(20,20,20,.94);
-    border:1px solid rgba(255,255,255,.15);
-    border-radius:16px;
-    padding:14px;
-    width:min(320px, 82vw);
-  }
-  #settings-popover.open{ display:block; }
-
-  #rec-indicator{
-    display:none;
-    align-items:center; gap:6px;
-    background:rgba(0,0,0,.6);
-    border:1px solid rgba(255,77,79,.6);
-    border-radius:20px;
-    padding:6px 12px;
-    font-size:13px;
-    font-weight:600;
-    color:#fff;
-  }
-  #rec-indicator.on{display:flex;}
-  #rec-indicator .rec-dot{
-    width:9px; height:9px; border-radius:50%; background:var(--danger);
-    animation: rec-pulse 1s infinite;
-  }
-  @keyframes rec-pulse{ 0%,100%{opacity:1;} 50%{opacity:.25;} }
-
-  .center-line{
-    position:absolute;
-    left:0; right:0; top:50%;
-    height:0;
-    border-top:1.5px dashed rgba(255,210,31,.55);
-    pointer-events:none;
-    z-index:2;
-  }
-
+  /* ---------- top bar ---------- */
   #topbar{
     position:absolute; top:0; left:0; right:0;
     padding: calc(var(--safe-top) + 8px) calc(var(--safe-right) + 12px) 8px calc(var(--safe-left) + 12px);
     display:flex; align-items:center; justify-content:space-between;
-    z-index:3;
+    z-index:4;
     background:linear-gradient(rgba(0,0,0,.65), transparent);
     pointer-events:none;
   }
@@ -302,187 +146,156 @@
   }
   #progress-bar{height:100%; width:0%; background:var(--accent);}
 
-  #controls{
+  #rec-indicator{
+    display:none;
+    align-items:center; gap:6px;
+    background:rgba(0,0,0,.6);
+    border:1px solid rgba(255,77,79,.6);
+    border-radius:20px;
+    padding:6px 12px;
+    font-size:13px;
+    font-weight:600;
+    color:#fff;
+  }
+  #rec-indicator.on{display:flex;}
+  #rec-indicator .rec-dot{
+    width:9px; height:9px; border-radius:50%; background:var(--danger);
+    animation: rec-pulse 1s infinite;
+  }
+  @keyframes rec-pulse{ 0%,100%{opacity:1;} 50%{opacity:.25;} }
+
+  /* ---------- bottom camera bar ---------- */
+  #camera-bar{
     position:absolute; left:0; right:0; bottom:0;
-    padding: 10px calc(var(--safe-right) + 12px) calc(var(--safe-bottom) + 12px) calc(var(--safe-left) + 12px);
-    background:linear-gradient(transparent, rgba(0,0,0,.75) 40%);
-    z-index:3;
-    display:flex; flex-direction:column; gap:8px;
+    padding:14px calc(var(--safe-right) + 28px) calc(var(--safe-bottom) + 20px) calc(var(--safe-left) + 28px);
+    display:flex; align-items:center; justify-content:space-between;
+    z-index:4;
+    background:linear-gradient(transparent, rgba(0,0,0,.6) 55%);
   }
-  .ctrl-sliders{
-    display:flex; gap:10px; min-width:0;
+  #cam-record-btn{
+    width:72px; height:72px; border-radius:50%;
+    background:var(--danger); border:4px solid #fff;
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
   }
-  .ctrl-slider{
-    flex:1; min-width:0;
-    background:rgba(20,20,20,.65);
-    border:1px solid rgba(255,255,255,.12);
+  #cam-record-btn .dot{ width:26px; height:26px; border-radius:50%; background:#fff; transition:border-radius .15s ease, width .15s ease, height .15s ease; }
+  #cam-record-btn.recording .dot{ border-radius:6px; width:22px; height:22px; }
+
+  .cam-side-btn{
+    width:48px; height:48px; border-radius:50%;
+    background:rgba(20,20,20,.55); border:1px solid rgba(255,255,255,.18);
+    color:#fff; font-size:18px;
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
+  }
+  .cam-side-btn:disabled{ opacity:.35; }
+  .cam-side-btn-spacer{ width:48px; }
+
+  /* ---------- settings popover ---------- */
+  #settings-popover{
+    display:none;
+    flex-direction:column; gap:10px;
+    position:absolute;
+    left:50%; bottom:calc(var(--safe-bottom) + 108px);
+    transform:translateX(-50%);
+    z-index:5;
+    background:rgba(20,20,20,.94);
+    border:1px solid rgba(255,255,255,.15);
+    border-radius:16px;
+    padding:14px;
+    width:min(300px, 84vw);
+  }
+  #settings-popover.open{ display:flex; }
+  .ctrl-row{
+    display:flex; align-items:center; gap:10px;
+    background:rgba(255,255,255,.06);
     border-radius:12px;
     padding:6px 12px;
-    display:flex; align-items:center; gap:8px;
   }
-  .ctrl-slider span.lbl{font-size:11px; color:var(--muted); width:34px; flex-shrink:0;}
-  .ctrl-slider input[type=range]{margin:0; min-width:0;}
-  .ctrl-buttons{
-    display:flex; align-items:center; justify-content:center; gap:12px; row-gap:10px; flex-wrap:wrap;
+  .ctrl-row span.lbl{font-size:12px; color:var(--muted); width:46px; flex-shrink:0;}
+  .ctrl-row input[type=range]{flex:1; min-width:0; accent-color:var(--accent); height:34px; margin:0;}
+
+  /* ---------- start overlay ---------- */
+  #start-overlay{
+    position:absolute; inset:0; z-index:10;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:18px;
+    padding: calc(var(--safe-top) + 24px) 32px calc(var(--safe-bottom) + 24px);
+    background:#000;
+    text-align:center;
   }
-  #play-btn{
-    width:64px; height:64px;
-    border-radius:50%;
-    background:var(--accent);
+  #start-overlay.hidden{ display:none; }
+  #start-overlay .dot{width:14px;height:14px;border-radius:50%;background:var(--accent);}
+  #start-overlay h1{font-size:22px; margin:0; font-weight:700;}
+  #start-overlay p{margin:0; font-size:13.5px; color:var(--muted); line-height:1.5; max-width:320px;}
+  #start-btn{
+    padding:16px 36px;
     border:none;
+    border-radius:14px;
+    background:var(--accent);
     color:#161616;
-    font-size:26px;
-    display:flex; align-items:center; justify-content:center;
+    font-size:17px;
+    font-weight:700;
     cursor:pointer;
   }
-  .side-btn{
-    width:46px; height:46px;
-    border-radius:50%;
-    background:rgba(20,20,20,.65);
-    border:1px solid rgba(255,255,255,.12);
-    color:var(--text);
-    font-size:16px;
-    display:flex; align-items:center; justify-content:center;
-    cursor:pointer;
-  }
-  .side-btn.active{border-color:var(--accent); color:var(--accent);}
-  .side-btn:disabled{opacity:.35; cursor:default;}
-
-  #play-btn.rec-mode{background:var(--danger); color:#fff;}
-  #play-btn.rec-mode.recording{border-radius:18px;}
-
-  .segmented{display:flex; gap:8px; margin-top:10px;}
-  .segmented .seg-btn{
-    flex:1; text-align:center; padding:10px 8px; border-radius:10px;
-    background:var(--panel-2); border:1px solid #2a2b2f; color:var(--muted);
-    font-size:13px; cursor:pointer; user-select:none;
-  }
-  .segmented .seg-btn.on{background:rgba(255,210,31,.12); border-color:var(--accent); color:var(--accent); font-weight:600;}
-  .card .subnote{font-size:11.5px; color:var(--muted); margin-top:10px; line-height:1.4;}
-  .card[hidden]{display:none;}
-
-  #controls.hidden-ui{opacity:0; pointer-events:none;}
-  #topbar.hidden-ui{opacity:0; pointer-events:none;}
-
-  @media (orientation:landscape){
-    #reader-inner{padding-left:12vw; padding-right:12vw;}
-  }
+  #start-btn:active{opacity:.85;}
 </style>
 </head>
 <body>
 <div id="app">
 
-  <!-- ===================== SETUP SCREEN ===================== -->
-  <div id="setup-screen" class="screen active">
-    <div class="brand">
-      <div class="dot"></div>
-      <div>
-        <h1>Teleprompter</h1>
-        <p>Scrivi o incolla il testo, regola velocità e dimensione, poi avvia.</p>
-      </div>
+  <video id="camera-video" playsinline autoplay muted></video>
+  <div class="camera-dim"></div>
+
+  <div id="reader">
+    <div id="box-header">
+      <button id="box-hide-btn" title="Nascondi/mostra testo">👁</button>
+      <div class="drag-grip"></div>
+      <button id="box-settings-btn" title="Impostazioni">⚙</button>
     </div>
-
-    <textarea id="script-input" placeholder="Incolla o scrivi qui il tuo testo..."></textarea>
-
-    <div class="card">
-      <div class="row">
-        <label>Velocità <span class="val" id="speed-val">5</span></label>
-        <input type="range" id="speed-range" min="1" max="20" step="1" value="5">
-      </div>
-      <div class="row">
-        <label>Grandezza testo <span class="val" id="size-val">42px</span></label>
-        <input type="range" id="size-range" min="18" max="120" step="1" value="42">
-      </div>
+    <div id="reader-inner">
+      <div id="prompter-text" contenteditable="true"></div>
     </div>
-
-    <div class="card">
-      <div class="toggle-row">
-        <div class="toggle-btn" id="toggle-mirror-h">Specchio orizzontale</div>
-        <div class="toggle-btn" id="toggle-mirror-v">Specchio verticale</div>
-      </div>
-      <p class="subnote">Lo specchio serve solo se usi un vetro da teleprompter fisico. Se registri con la fotocamera del telefono lascialo spento.</p>
+    <div id="resize-handle">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round">
+        <path d="M20 20L14 20M20 20L20 14M20 20L9 9"/>
+      </svg>
     </div>
-
-    <div class="card">
-      <div class="toggle-row">
-        <div class="toggle-btn" id="toggle-camera">📷 Registra con la fotocamera</div>
-      </div>
-      <div class="segmented" id="facing-mode-row" hidden>
-        <div class="seg-btn on" id="facing-user">Anteriore (selfie)</div>
-        <div class="seg-btn" id="facing-environment">Posteriore</div>
-      </div>
-      <p class="subnote">Il testo resta solo sullo schermo per aiutarti a leggere: nel video registrato si vedono solo tu e l'audio, non il testo. Il telefono chiederà il permesso di usare fotocamera e microfono.</p>
-    </div>
-
-    <button id="start-btn">Avvia Teleprompter</button>
-    <p class="hint">Suggerimento: ruota il telefono in orizzontale o verticale in qualsiasi momento, il testo si adatta automaticamente. Durante la lettura lo schermo resta acceso.</p>
   </div>
 
-  <!-- ===================== PROMPTER SCREEN ===================== -->
-  <div id="prompter-screen" class="screen">
-    <video id="camera-video" playsinline autoplay muted></video>
-    <div class="camera-dim"></div>
-    <div id="reader">
-      <div id="box-header">
-        <button id="box-hide-btn" title="Nascondi/mostra testo">👁</button>
-        <div class="drag-grip"></div>
-        <button id="box-settings-btn" title="Impostazioni">⚙</button>
-      </div>
-      <div id="reader-inner">
-        <div id="prompter-text"></div>
-      </div>
-    </div>
-    <div class="center-line"></div>
+  <div id="topbar">
+    <button class="icon-btn" id="stop-btn" title="Ferma">✕</button>
+    <div id="rec-indicator"><span class="rec-dot"></span><span id="rec-time">00:00</span></div>
+    <div id="progress-wrap"><div id="progress-bar"></div></div>
+    <button class="icon-btn" id="restart-btn" title="Riavvia">↺</button>
+  </div>
 
-    <div id="topbar">
-      <button class="icon-btn" id="exit-btn" title="Esci">✕</button>
-      <div id="rec-indicator"><span class="rec-dot"></span><span id="rec-time">00:00</span></div>
-      <div id="progress-wrap"><div id="progress-bar"></div></div>
-      <button class="icon-btn" id="restart-btn" title="Riavvia">↺</button>
+  <div id="settings-popover">
+    <div class="ctrl-row">
+      <span class="lbl">Zoom</span>
+      <input type="range" id="pb-zoom" min="0.5" max="1.5" step="0.05" value="0.85">
     </div>
+    <div class="ctrl-row">
+      <span class="lbl">Vel.</span>
+      <input type="range" id="pb-speed" min="1" max="20" step="1" value="5">
+    </div>
+    <div class="ctrl-row">
+      <span class="lbl">Testo</span>
+      <input type="range" id="pb-size" min="14" max="80" step="1" value="26">
+    </div>
+  </div>
 
-    <div id="controls">
-      <div class="ctrl-sliders">
-        <div class="ctrl-slider">
-          <span class="lbl">Vel.</span>
-          <input type="range" id="live-speed" min="1" max="20" step="1" value="5">
-        </div>
-        <div class="ctrl-slider">
-          <span class="lbl">Testo</span>
-          <input type="range" id="live-size" min="18" max="120" step="1" value="42">
-        </div>
-      </div>
-      <div class="ctrl-buttons">
-        <button class="side-btn" id="mirror-h-btn" title="Specchio orizzontale">⇋</button>
-        <button class="side-btn" id="mirror-v-btn" title="Specchio verticale">⇵</button>
-        <button id="play-btn" title="Play/Pausa">▶</button>
-        <button class="side-btn" id="fullscreen-btn" title="Schermo intero">⛶</button>
-        <button class="side-btn" id="hide-ui-btn" title="Nascondi controlli">👁</button>
-      </div>
-    </div>
+  <div id="camera-bar">
+    <button class="cam-side-btn" id="switch-camera-btn" title="Cambia fotocamera">🔄</button>
+    <button id="cam-record-btn" title="Registra"><span class="dot"></span></button>
+    <div class="cam-side-btn-spacer"></div>
+  </div>
 
-    <div id="settings-popover">
-      <div class="ctrl-sliders">
-        <div class="ctrl-slider">
-          <span class="lbl">Vel.</span>
-          <input type="range" id="pb-speed" min="1" max="20" step="1" value="5">
-        </div>
-        <div class="ctrl-slider">
-          <span class="lbl">Testo</span>
-          <input type="range" id="pb-size" min="18" max="120" step="1" value="42">
-        </div>
-      </div>
-      <div class="toggle-row" style="margin-top:10px;">
-        <div class="toggle-btn" id="pb-mirror-h">Specchio orizz.</div>
-        <div class="toggle-btn" id="pb-mirror-v">Specchio vert.</div>
-      </div>
-    </div>
-
-    <div id="camera-bar">
-      <button class="cam-side-btn" id="switch-camera-btn" title="Cambia fotocamera">🔄</button>
-      <button id="cam-record-btn" title="Registra"><span class="dot"></span></button>
-      <div class="cam-side-btn-spacer"></div>
-    </div>
+  <div id="start-overlay">
+    <div class="dot"></div>
+    <h1>Teleprompter Fotocamera</h1>
+    <p>Apri direttamente sulla fotocamera con il teleprompter incorporato: scrivi il testo dentro il riquadro, spostalo e ridimensionalo dove vuoi, poi registra. Servirà il permesso di fotocamera e microfono.</p>
+    <button id="start-btn">Tocca per iniziare</button>
   </div>
 
 </div>
@@ -491,64 +304,43 @@
 (() => {
   const $ = (id) => document.getElementById(id);
 
-  const setupScreen = $('setup-screen');
-  const prompterScreen = $('prompter-screen');
-  const scriptInput = $('script-input');
-  const speedRange = $('speed-range');
-  const sizeRange = $('size-range');
-  const speedVal = $('speed-val');
-  const sizeVal = $('size-val');
-  const toggleMirrorH = $('toggle-mirror-h');
-  const toggleMirrorV = $('toggle-mirror-v');
-  const toggleCamera = $('toggle-camera');
-  const facingModeRow = $('facing-mode-row');
-  const facingUserBtn = $('facing-user');
-  const facingEnvBtn = $('facing-environment');
+  const startOverlay = $('start-overlay');
   const startBtn = $('start-btn');
 
+  const cameraVideo = $('camera-video');
   const reader = $('reader');
   const readerInner = $('reader-inner');
   const promptText = $('prompter-text');
-  const liveSpeed = $('live-speed');
-  const liveSize = $('live-size');
-  const playBtn = $('play-btn');
-  const restartBtn = $('restart-btn');
-  const exitBtn = $('exit-btn');
-  const mirrorHBtn = $('mirror-h-btn');
-  const mirrorVBtn = $('mirror-v-btn');
-  const fullscreenBtn = $('fullscreen-btn');
-  const hideUiBtn = $('hide-ui-btn');
-  const controls = $('controls');
-  const topbar = $('topbar');
-  const progressBar = $('progress-bar');
-  const cameraVideo = $('camera-video');
-  const switchCameraBtn = $('switch-camera-btn');
-  const recIndicator = $('rec-indicator');
-  const recTimeEl = $('rec-time');
   const boxHeader = $('box-header');
   const boxHideBtn = $('box-hide-btn');
   const boxSettingsBtn = $('box-settings-btn');
+  const resizeHandle = $('resize-handle');
+
+  const stopBtn = $('stop-btn');
+  const restartBtn = $('restart-btn');
+  const progressBar = $('progress-bar');
+  const recIndicator = $('rec-indicator');
+  const recTimeEl = $('rec-time');
+
   const settingsPopover = $('settings-popover');
+  const pbZoom = $('pb-zoom');
   const pbSpeed = $('pb-speed');
   const pbSize = $('pb-size');
-  const pbMirrorH = $('pb-mirror-h');
-  const pbMirrorV = $('pb-mirror-v');
+
+  const switchCameraBtn = $('switch-camera-btn');
   const camRecordBtn = $('cam-record-btn');
 
   const state = {
     speed: 5,
-    size: 42,
-    mirrorH: false,
-    mirrorV: false,
-    playing: false,
-    uiHidden: false,
-    cameraOn: false,
+    size: 26,
+    zoom: 0.85,
     facingMode: 'user',
+    playing: false,
     recording: false,
   };
 
   // ---------- persistence ----------
-  const STORAGE_KEY = 'teleprompter-settings-v1';
+  const STORAGE_KEY = 'teleprompter-settings-v2';
   function loadSettings(){
     try{
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -556,77 +348,45 @@
       const s = JSON.parse(raw);
       if(s.speed) state.speed = s.speed;
       if(s.size) state.size = s.size;
-      if(typeof s.mirrorH === 'boolean') state.mirrorH = s.mirrorH;
-      if(typeof s.mirrorV === 'boolean') state.mirrorV = s.mirrorV;
-      if(typeof s.cameraOn === 'boolean') state.cameraOn = s.cameraOn;
+      if(s.zoom) state.zoom = s.zoom;
       if(s.facingMode) state.facingMode = s.facingMode;
-      if(typeof s.text === 'string') scriptInput.value = s.text;
+      if(typeof s.text === 'string') promptText.innerText = s.text;
     }catch(e){}
   }
   function saveSettings(){
     try{
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        speed: state.speed, size: state.size,
-        mirrorH: state.mirrorH, mirrorV: state.mirrorV,
-        cameraOn: state.cameraOn, facingMode: state.facingMode,
-        text: scriptInput.value
+        speed: state.speed, size: state.size, zoom: state.zoom,
+        facingMode: state.facingMode,
+        text: promptText.innerText
       }));
     }catch(e){}
   }
 
   function syncUI(){
-    speedRange.value = state.speed;
-    liveSpeed.value = state.speed;
-    speedVal.textContent = state.speed;
-    sizeRange.value = state.size;
-    liveSize.value = state.size;
-    sizeVal.textContent = state.size + 'px';
-    promptText.style.fontSize = state.size + 'px';
-    toggleMirrorH.classList.toggle('on', state.mirrorH);
-    toggleMirrorV.classList.toggle('on', state.mirrorV);
-    mirrorHBtn.classList.toggle('active', state.mirrorH);
-    mirrorVBtn.classList.toggle('active', state.mirrorV);
-    readerInner.classList.toggle('mirror-h', state.mirrorH);
-    readerInner.classList.toggle('mirror-v', state.mirrorV);
-
-    toggleCamera.classList.toggle('on', state.cameraOn);
-    facingModeRow.hidden = !state.cameraOn;
-    facingUserBtn.classList.toggle('on', state.facingMode === 'user');
-    facingEnvBtn.classList.toggle('on', state.facingMode === 'environment');
-    playBtn.classList.toggle('rec-mode', state.cameraOn);
-
     pbSpeed.value = state.speed;
     pbSize.value = state.size;
-    pbMirrorH.classList.toggle('on', state.mirrorH);
-    pbMirrorV.classList.toggle('on', state.mirrorV);
-
+    pbZoom.value = state.zoom;
+    promptText.style.fontSize = state.size + 'px';
+    cameraVideo.style.setProperty('--zoom', state.zoom);
     updateMainButtonIcon();
   }
 
   loadSettings();
   syncUI();
 
-  // ---------- setup screen interactions ----------
-  speedRange.addEventListener('input', () => { state.speed = +speedRange.value; syncUI(); saveSettings(); });
-  sizeRange.addEventListener('input', () => { state.size = +sizeRange.value; syncUI(); saveSettings(); });
-  toggleMirrorH.addEventListener('click', () => { state.mirrorH = !state.mirrorH; syncUI(); saveSettings(); });
-  toggleMirrorV.addEventListener('click', () => { state.mirrorV = !state.mirrorV; syncUI(); saveSettings(); });
-  toggleCamera.addEventListener('click', () => { state.cameraOn = !state.cameraOn; syncUI(); saveSettings(); });
-  facingUserBtn.addEventListener('click', () => { state.facingMode = 'user'; syncUI(); saveSettings(); });
-  facingEnvBtn.addEventListener('click', () => { state.facingMode = 'environment'; syncUI(); saveSettings(); });
-  scriptInput.addEventListener('change', saveSettings);
-
-  // ---------- live control screen interactions ----------
-  liveSpeed.addEventListener('input', () => { state.speed = +liveSpeed.value; syncUI(); saveSettings(); });
-  liveSize.addEventListener('input', () => { state.size = +liveSize.value; syncUI(); saveSettings(); });
-  mirrorHBtn.addEventListener('click', () => { state.mirrorH = !state.mirrorH; syncUI(); saveSettings(); });
-  mirrorVBtn.addEventListener('click', () => { state.mirrorV = !state.mirrorV; syncUI(); saveSettings(); });
-
-  // ---------- floating prompter box (camera mode) ----------
   pbSpeed.addEventListener('input', () => { state.speed = +pbSpeed.value; syncUI(); saveSettings(); });
   pbSize.addEventListener('input', () => { state.size = +pbSize.value; syncUI(); saveSettings(); });
-  pbMirrorH.addEventListener('click', () => { state.mirrorH = !state.mirrorH; syncUI(); saveSettings(); });
-  pbMirrorV.addEventListener('click', () => { state.mirrorV = !state.mirrorV; syncUI(); saveSettings(); });
+  pbZoom.addEventListener('input', () => { state.zoom = +pbZoom.value; syncUI(); saveSettings(); });
+
+  promptText.addEventListener('input', saveSettings);
+
+  // plain-text paste only: avoid pulling in rich formatting from the clipboard
+  promptText.addEventListener('paste', (e) => {
+    e.preventDefault();
+    const text = (e.clipboardData || window.clipboardData).getData('text/plain');
+    document.execCommand('insertText', false, text);
+  });
 
   boxHideBtn.addEventListener('click', () => {
     reader.classList.toggle('box-collapsed');
@@ -634,45 +394,114 @@
   boxSettingsBtn.addEventListener('click', () => {
     settingsPopover.classList.toggle('open');
   });
-  camRecordBtn.addEventListener('click', handleMainButton);
 
-  // drag the box around the camera preview by its header
+  // don't let a tap on the box toggle play/pause when it lands on the header controls
+  reader.addEventListener('click', (e) => {
+    if(e.target.closest('#box-header') || e.target.closest('#resize-handle')) return;
+  });
+
+  // ---------- drag the box by its header ----------
   (function setupBoxDrag(){
     let dragging = false, startX = 0, startY = 0, startLeft = 0, startTop = 0;
-    boxHeader.addEventListener('pointerdown', (e) => {
-      if(!prompterScreen.classList.contains('camera-mode')) return;
-      if(e.target.closest('button')) return; // don't hijack the hide/settings buttons' own click
+
+    function onDown(clientX, clientY, target){
+      if(target.closest('button')) return false;
       dragging = true;
-      boxHeader.setPointerCapture(e.pointerId);
       const r = reader.getBoundingClientRect();
-      startX = e.clientX; startY = e.clientY;
+      startX = clientX; startY = clientY;
       startLeft = r.left; startTop = r.top;
       reader.style.width = r.width + 'px';
       reader.style.right = 'auto';
       reader.style.left = startLeft + 'px';
       reader.style.top = startTop + 'px';
-    });
-    boxHeader.addEventListener('pointermove', (e) => {
+      return true;
+    }
+    function onMove(clientX, clientY){
       if(!dragging) return;
-      const dx = e.clientX - startX, dy = e.clientY - startY;
+      const dx = clientX - startX, dy = clientY - startY;
       const bw = reader.offsetWidth, bh = reader.offsetHeight;
       let nl = startLeft + dx, nt = startTop + dy;
       nl = Math.max(4, Math.min(window.innerWidth - bw - 4, nl));
       nt = Math.max(4, Math.min(window.innerHeight - bh - 4, nt));
       reader.style.left = nl + 'px';
       reader.style.top = nt + 'px';
-    });
-    function endDrag(e){
-      if(!dragging) return;
-      dragging = false;
-      try{ boxHeader.releasePointerCapture(e.pointerId); }catch(_){}
     }
-    boxHeader.addEventListener('pointerup', endDrag);
-    boxHeader.addEventListener('pointercancel', endDrag);
+    function onUp(){ dragging = false; }
+
+    boxHeader.addEventListener('pointerdown', (e) => {
+      if(onDown(e.clientX, e.clientY, e.target)){
+        try{ boxHeader.setPointerCapture(e.pointerId); }catch(_){}
+      }
+    });
+    boxHeader.addEventListener('pointermove', (e) => onMove(e.clientX, e.clientY));
+    boxHeader.addEventListener('pointerup', onUp);
+    boxHeader.addEventListener('pointercancel', onUp);
+
+    // touch fallback for browsers/webviews with partial Pointer Events support
+    boxHeader.addEventListener('touchstart', (e) => {
+      const t = e.touches[0];
+      if(onDown(t.clientX, t.clientY, e.target)) e.preventDefault();
+    }, { passive:false });
+    boxHeader.addEventListener('touchmove', (e) => {
+      if(!dragging) return;
+      e.preventDefault();
+      const t = e.touches[0];
+      onMove(t.clientX, t.clientY);
+    }, { passive:false });
+    boxHeader.addEventListener('touchend', onUp);
+    boxHeader.addEventListener('touchcancel', onUp);
   })();
 
-  function resetBoxPosition(){
-    reader.style.left = ''; reader.style.top = ''; reader.style.right = ''; reader.style.width = '';
+  // ---------- resize the box by its corner handle ----------
+  (function setupBoxResize(){
+    let resizing = false, startX = 0, startY = 0, startW = 0, startH = 0;
+
+    function onDown(clientX, clientY){
+      resizing = true;
+      const r = reader.getBoundingClientRect();
+      startX = clientX; startY = clientY;
+      startW = r.width; startH = r.height;
+      reader.style.right = 'auto';
+    }
+    function onMove(clientX, clientY){
+      if(!resizing) return;
+      const dx = clientX - startX, dy = clientY - startY;
+      const rect = reader.getBoundingClientRect();
+      const maxW = window.innerWidth - rect.left - 4;
+      const maxH = window.innerHeight - rect.top - 4;
+      const nw = Math.max(160, Math.min(maxW, startW + dx));
+      const nh = Math.max(90, Math.min(maxH, startH + dy));
+      reader.style.width = nw + 'px';
+      reader.style.height = nh + 'px';
+    }
+    function onUp(){ resizing = false; }
+
+    resizeHandle.addEventListener('pointerdown', (e) => {
+      onDown(e.clientX, e.clientY);
+      try{ resizeHandle.setPointerCapture(e.pointerId); }catch(_){}
+    });
+    resizeHandle.addEventListener('pointermove', (e) => onMove(e.clientX, e.clientY));
+    resizeHandle.addEventListener('pointerup', onUp);
+    resizeHandle.addEventListener('pointercancel', onUp);
+
+    resizeHandle.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      const t = e.touches[0];
+      onDown(t.clientX, t.clientY);
+    }, { passive:false });
+    resizeHandle.addEventListener('touchmove', (e) => {
+      if(!resizing) return;
+      e.preventDefault();
+      const t = e.touches[0];
+      onMove(t.clientX, t.clientY);
+    }, { passive:false });
+    resizeHandle.addEventListener('touchend', onUp);
+    resizeHandle.addEventListener('touchcancel', onUp);
+  })();
+
+  function resetBoxGeometry(){
+    reader.style.left = ''; reader.style.top = ''; reader.style.right = '';
+    reader.style.width = ''; reader.style.height = '';
     reader.classList.remove('box-collapsed');
     settingsPopover.classList.remove('open');
   }
@@ -700,16 +529,6 @@
     if(document.visibilityState === 'visible' && (state.playing || state.recording)) requestWakeLock();
   });
 
-  // ---------- fullscreen ----------
-  function toggleFullscreen(){
-    if(!document.fullscreenElement){
-      document.documentElement.requestFullscreen?.().catch(()=>{});
-    } else {
-      document.exitFullscreen?.().catch(()=>{});
-    }
-  }
-  fullscreenBtn.addEventListener('click', toggleFullscreen);
-
   // ---------- camera + recording ----------
   let cameraStream = null;
   let mediaRecorder = null;
@@ -732,7 +551,6 @@
     stopCameraStream();
     if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
       alert('Questo browser non supporta la fotocamera dal web. Prova con Chrome o Safari aggiornati.');
-      state.cameraOn = false; syncUI(); saveSettings();
       return false;
     }
     try{
@@ -745,25 +563,9 @@
       return true;
     }catch(e){
       alert('Impossibile accedere alla fotocamera o al microfono. Controlla i permessi del browser per questo sito.');
-      state.cameraOn = false; syncUI(); saveSettings();
       return false;
     }
   }
-
-  // re-acquire the camera stream on rotation so the recorded video matches the
-  // phone's current orientation instead of keeping the aspect ratio it opened with
-  let orientationRestartTimer = null;
-  window.addEventListener('resize', () => {
-    if(!state.cameraOn || !cameraStream || state.recording) return;
-    clearTimeout(orientationRestartTimer);
-    orientationRestartTimer = setTimeout(() => { startCamera(); }, 400);
-  });
-
-  // dragged box position is screen-relative: snap it back to the default
-  // spot on rotation instead of letting it end up off-screen
-  window.addEventListener('resize', () => {
-    if(prompterScreen.classList.contains('camera-mode')) resetBoxPosition();
-  });
 
   function stopCameraStream(){
     if(cameraStream){
@@ -773,10 +575,21 @@
     cameraVideo.srcObject = null;
   }
 
+  // re-acquire the camera stream on rotation so the recorded video matches the
+  // phone's current orientation, and snap the box back to a sane default spot/size
+  let orientationRestartTimer = null;
+  window.addEventListener('resize', () => {
+    if(!startOverlay.classList.contains('hidden')) return;
+    resetBoxGeometry();
+    if(state.recording) return;
+    clearTimeout(orientationRestartTimer);
+    orientationRestartTimer = setTimeout(() => { startCamera(); }, 400);
+  });
+
   switchCameraBtn.addEventListener('click', async () => {
     if(state.recording) return;
     state.facingMode = state.facingMode === 'user' ? 'environment' : 'user';
-    syncUI(); saveSettings();
+    saveSettings();
     await startCamera();
   });
 
@@ -820,8 +633,8 @@
     mediaRecorder.onstop = handleRecordingStop;
     mediaRecorder.start(1000);
     state.recording = true;
+    promptText.contentEditable = 'false';
     recIndicator.classList.add('on');
-    playBtn.classList.add('recording');
     updateMainButtonIcon();
     syncWakeLock();
     recStartTs = Date.now();
@@ -834,7 +647,6 @@
     if(mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
     state.recording = false;
     recIndicator.classList.remove('on');
-    playBtn.classList.remove('recording');
     updateMainButtonIcon();
     syncWakeLock();
     clearInterval(recTimerId);
@@ -896,33 +708,26 @@
   }
 
   function updateMainButtonIcon(){
-    if(state.cameraOn){
-      playBtn.textContent = state.recording ? '⏹' : '⏺';
-    } else {
-      playBtn.textContent = state.playing ? '❚❚' : '▶';
-    }
     camRecordBtn.classList.toggle('recording', state.recording);
   }
 
   function play(){
     if(state.playing) return;
     state.playing = true;
-    updateMainButtonIcon();
+    promptText.contentEditable = 'false';
     lastTs = null;
     syncWakeLock();
     rafId = requestAnimationFrame(step);
   }
   function pause(){
     state.playing = false;
-    updateMainButtonIcon();
+    if(!state.recording) promptText.contentEditable = 'true';
     if(rafId) cancelAnimationFrame(rafId);
     rafId = null;
     syncWakeLock();
   }
-  function togglePlay(){ state.playing ? pause() : play(); }
 
   function handleMainButton(){
-    if(!state.cameraOn){ togglePlay(); return; }
     if(!state.recording){
       startRecording();
       if(!state.playing) play();
@@ -931,75 +736,46 @@
       pause();
     }
   }
-  playBtn.addEventListener('click', handleMainButton);
+  camRecordBtn.addEventListener('click', handleMainButton);
 
   restartBtn.addEventListener('click', () => {
-    pause();
     reader.scrollTop = 0;
     updateProgress();
   });
 
-  // tap on text area toggles play/pause too (ignore taps on the box header controls)
-  reader.addEventListener('click', (e) => {
-    if(e.target.closest('#box-header')) return;
-    togglePlay();
-  });
-
-  // manual scroll (drag) should sync progress bar
   reader.addEventListener('scroll', updateProgress);
 
-  // ---------- hide/show UI ----------
-  hideUiBtn.addEventListener('click', () => {
-    state.uiHidden = !state.uiHidden;
-    controls.classList.toggle('hidden-ui', state.uiHidden);
-    topbar.classList.toggle('hidden-ui', state.uiHidden);
-  });
-
-  // ---------- start / exit ----------
-  async function startPrompter(){
-    const text = scriptInput.value.trim();
-    promptText.textContent = text.length ? text : 'Nessun testo inserito.\n\nTorna indietro e scrivi il tuo copione.';
-    syncUI();
-    saveSettings();
-    setupScreen.classList.remove('active');
-    prompterScreen.classList.add('active');
+  // ---------- start / stop ----------
+  async function startApp(){
+    startOverlay.classList.add('hidden');
+    document.documentElement.requestFullscreen?.().catch(()=>{});
+    resetBoxGeometry();
+    await startCamera();
     reader.scrollTop = 0;
     updateProgress();
-    pause();
-
-    prompterScreen.classList.toggle('camera-mode', state.cameraOn);
-    if(state.cameraOn){
-      resetBoxPosition();
-      const ok = await startCamera();
-      prompterScreen.classList.toggle('camera-mode', state.cameraOn && ok);
-      syncUI();
-    }
   }
 
-  function exitPrompter(){
+  function stopApp(){
     if(state.recording) stopRecording();
     pause();
     stopCameraStream();
-    prompterScreen.classList.remove('camera-mode');
-    prompterScreen.classList.remove('active');
-    setupScreen.classList.add('active');
     if(document.fullscreenElement) document.exitFullscreen?.().catch(()=>{});
+    startOverlay.classList.remove('hidden');
   }
 
-  startBtn.addEventListener('click', startPrompter);
-  exitBtn.addEventListener('click', exitPrompter);
+  startBtn.addEventListener('click', startApp);
+  stopBtn.addEventListener('click', stopApp);
 
   // ---------- keyboard shortcuts (useful with bluetooth remote / external keyboard) ----------
   document.addEventListener('keydown', (e) => {
-    if(!prompterScreen.classList.contains('active')) return;
-    if(e.code === 'Space'){ e.preventDefault(); togglePlay(); }
-    else if(e.code === 'ArrowUp'){ state.speed = Math.min(20, state.speed+1); syncUI(); }
-    else if(e.code === 'ArrowDown'){ state.speed = Math.max(1, state.speed-1); syncUI(); }
-    else if(e.code === 'Escape'){ exitPrompter(); }
+    if(startOverlay && !startOverlay.classList.contains('hidden')) return;
+    if(e.code === 'Space' && document.activeElement !== promptText){
+      e.preventDefault();
+      state.playing ? pause() : play();
+    }
+    else if(e.code === 'ArrowUp'){ state.speed = Math.min(20, state.speed+1); syncUI(); saveSettings(); }
+    else if(e.code === 'ArrowDown'){ state.speed = Math.max(1, state.speed-1); syncUI(); saveSettings(); }
   });
-
-  // ---------- orientation change: keep scroll position stable ----------
-  window.addEventListener('resize', updateProgress);
 
   // ---------- register service worker (offline / installable) ----------
   if('serviceWorker' in navigator){
