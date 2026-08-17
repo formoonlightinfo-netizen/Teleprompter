@@ -43,10 +43,10 @@
     width:100%; height:100%;
     object-fit:cover;
     background:#000;
-    transform:scale(var(--zoom, 0.85));
+    transform:scale(var(--zoom, 1));
     z-index:0;
   }
-  #camera-video.mirror-preview{transform:scaleX(-1) scale(var(--zoom, 0.85));}
+  #camera-video.mirror-preview{transform:scaleX(-1) scale(var(--zoom, 1));}
   .camera-dim{
     position:absolute; inset:0;
     background:rgba(0,0,0,.1);
@@ -114,12 +114,13 @@
   }
 
   #resize-handle{
-    position:absolute; right:2px; bottom:2px; width:26px; height:26px;
-    z-index:3; cursor:nwse-resize; touch-action:none;
-    display:flex; align-items:flex-end; justify-content:flex-end;
-    padding:4px;
+    position:absolute; left:0; right:0; bottom:0; height:20px;
+    z-index:3; cursor:ns-resize; touch-action:none;
+    display:flex; align-items:center; justify-content:center;
   }
-  #resize-handle svg{ width:14px; height:14px; opacity:.6; }
+  #resize-handle .resize-grip{
+    width:36px; height:4px; background:rgba(255,255,255,.5); border-radius:4px;
+  }
 
   /* ---------- top bar ---------- */
   #topbar{
@@ -257,9 +258,7 @@
       <div id="prompter-text" contenteditable="true"></div>
     </div>
     <div id="resize-handle">
-      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round">
-        <path d="M20 20L14 20M20 20L20 14M20 20L9 9"/>
-      </svg>
+      <div class="resize-grip"></div>
     </div>
   </div>
 
@@ -273,7 +272,7 @@
   <div id="settings-popover">
     <div class="ctrl-row">
       <span class="lbl">Zoom</span>
-      <input type="range" id="pb-zoom" min="0.5" max="1.5" step="0.05" value="0.85">
+      <input type="range" id="pb-zoom" min="1" max="2.2" step="0.05" value="1">
     </div>
     <div class="ctrl-row">
       <span class="lbl">Vel.</span>
@@ -333,7 +332,7 @@
   const state = {
     speed: 5,
     size: 26,
-    zoom: 0.85,
+    zoom: 1,
     facingMode: 'user',
     playing: false,
     recording: false,
@@ -400,108 +399,101 @@
     if(e.target.closest('#box-header') || e.target.closest('#resize-handle')) return;
   });
 
-  // ---------- drag the box by its header ----------
+  // ---------- move the box up/down by its header ----------
+  // width stays fixed and centered (left/right come from CSS) - only the
+  // vertical position ever changes, so the box never drifts off-center
   (function setupBoxDrag(){
-    let dragging = false, startX = 0, startY = 0, startLeft = 0, startTop = 0;
+    let dragging = false, startY = 0, startTop = 0;
 
-    function onDown(clientX, clientY, target){
+    function onDown(clientY, target){
       if(target.closest('button')) return false;
       dragging = true;
       const r = reader.getBoundingClientRect();
-      startX = clientX; startY = clientY;
-      startLeft = r.left; startTop = r.top;
-      reader.style.width = r.width + 'px';
-      reader.style.right = 'auto';
-      reader.style.left = startLeft + 'px';
+      startY = clientY;
+      startTop = r.top;
       reader.style.top = startTop + 'px';
       return true;
     }
-    function onMove(clientX, clientY){
+    function onMove(clientY){
       if(!dragging) return;
-      const dx = clientX - startX, dy = clientY - startY;
-      const bw = reader.offsetWidth, bh = reader.offsetHeight;
-      let nl = startLeft + dx, nt = startTop + dy;
-      nl = Math.max(4, Math.min(window.innerWidth - bw - 4, nl));
+      const dy = clientY - startY;
+      const bh = reader.offsetHeight;
+      let nt = startTop + dy;
       nt = Math.max(4, Math.min(window.innerHeight - bh - 4, nt));
-      reader.style.left = nl + 'px';
       reader.style.top = nt + 'px';
     }
     function onUp(){ dragging = false; }
 
     boxHeader.addEventListener('pointerdown', (e) => {
-      if(onDown(e.clientX, e.clientY, e.target)){
+      if(onDown(e.clientY, e.target)){
         try{ boxHeader.setPointerCapture(e.pointerId); }catch(_){}
       }
     });
-    boxHeader.addEventListener('pointermove', (e) => onMove(e.clientX, e.clientY));
+    boxHeader.addEventListener('pointermove', (e) => onMove(e.clientY));
     boxHeader.addEventListener('pointerup', onUp);
     boxHeader.addEventListener('pointercancel', onUp);
 
     // touch fallback for browsers/webviews with partial Pointer Events support
     boxHeader.addEventListener('touchstart', (e) => {
       const t = e.touches[0];
-      if(onDown(t.clientX, t.clientY, e.target)) e.preventDefault();
+      if(onDown(t.clientY, e.target)) e.preventDefault();
     }, { passive:false });
     boxHeader.addEventListener('touchmove', (e) => {
       if(!dragging) return;
       e.preventDefault();
       const t = e.touches[0];
-      onMove(t.clientX, t.clientY);
+      onMove(t.clientY);
     }, { passive:false });
     boxHeader.addEventListener('touchend', onUp);
     boxHeader.addEventListener('touchcancel', onUp);
   })();
 
-  // ---------- resize the box by its corner handle ----------
+  // ---------- resize the box's height only, from the bottom edge ----------
+  // width/centering are never touched here either
   (function setupBoxResize(){
-    let resizing = false, startX = 0, startY = 0, startW = 0, startH = 0;
+    let resizing = false, startY = 0, startH = 0;
 
-    function onDown(clientX, clientY){
+    function onDown(clientY){
       resizing = true;
       const r = reader.getBoundingClientRect();
-      startX = clientX; startY = clientY;
-      startW = r.width; startH = r.height;
-      reader.style.right = 'auto';
+      startY = clientY;
+      startH = r.height;
     }
-    function onMove(clientX, clientY){
+    function onMove(clientY){
       if(!resizing) return;
-      const dx = clientX - startX, dy = clientY - startY;
+      const dy = clientY - startY;
       const rect = reader.getBoundingClientRect();
-      const maxW = window.innerWidth - rect.left - 4;
       const maxH = window.innerHeight - rect.top - 4;
-      const nw = Math.max(160, Math.min(maxW, startW + dx));
       const nh = Math.max(90, Math.min(maxH, startH + dy));
-      reader.style.width = nw + 'px';
       reader.style.height = nh + 'px';
     }
     function onUp(){ resizing = false; }
 
     resizeHandle.addEventListener('pointerdown', (e) => {
-      onDown(e.clientX, e.clientY);
+      onDown(e.clientY);
       try{ resizeHandle.setPointerCapture(e.pointerId); }catch(_){}
     });
-    resizeHandle.addEventListener('pointermove', (e) => onMove(e.clientX, e.clientY));
+    resizeHandle.addEventListener('pointermove', (e) => onMove(e.clientY));
     resizeHandle.addEventListener('pointerup', onUp);
     resizeHandle.addEventListener('pointercancel', onUp);
 
     resizeHandle.addEventListener('touchstart', (e) => {
       e.preventDefault();
       const t = e.touches[0];
-      onDown(t.clientX, t.clientY);
+      onDown(t.clientY);
     }, { passive:false });
     resizeHandle.addEventListener('touchmove', (e) => {
       if(!resizing) return;
       e.preventDefault();
       const t = e.touches[0];
-      onMove(t.clientX, t.clientY);
+      onMove(t.clientY);
     }, { passive:false });
     resizeHandle.addEventListener('touchend', onUp);
     resizeHandle.addEventListener('touchcancel', onUp);
   })();
 
   function resetBoxGeometry(){
-    reader.style.left = ''; reader.style.top = ''; reader.style.right = '';
-    reader.style.width = ''; reader.style.height = '';
+    reader.style.top = ''; reader.style.height = '';
     reader.classList.remove('box-collapsed');
     settingsPopover.classList.remove('open');
   }
