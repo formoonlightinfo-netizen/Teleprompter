@@ -640,7 +640,20 @@
     function draw(){
       if(recordCtx && cameraVideo.videoWidth){
         const c = computeCoverCrop(cameraVideo.videoWidth, cameraVideo.videoHeight, recordCanvas.width / recordCanvas.height, state.zoom);
-        recordCtx.drawImage(cameraVideo, c.sx, c.sy, c.sw, c.sh, 0, 0, recordCanvas.width, recordCanvas.height);
+        // On several Android/Chrome devices the front camera's raw track is
+        // already mirrored at the source (not just via our CSS preview
+        // flip), so drawImage() picks up an already-mirrored frame even
+        // though it ignores CSS. Explicitly un-mirror the front camera here
+        // so the saved file is always correctly oriented.
+        if(state.facingMode === 'user'){
+          recordCtx.save();
+          recordCtx.translate(recordCanvas.width, 0);
+          recordCtx.scale(-1, 1);
+          recordCtx.drawImage(cameraVideo, c.sx, c.sy, c.sw, c.sh, 0, 0, recordCanvas.width, recordCanvas.height);
+          recordCtx.restore();
+        } else {
+          recordCtx.drawImage(cameraVideo, c.sx, c.sy, c.sw, c.sh, 0, 0, recordCanvas.width, recordCanvas.height);
+        }
       }
       drawRafId = requestAnimationFrame(draw);
     }
