@@ -527,6 +527,17 @@
   let recStartTs = null;
   let recTimerId = null;
 
+  function videoConstraintsForScreen(){
+    const isPortrait = window.innerHeight >= window.innerWidth;
+    const long = 1920, short = 1080;
+    return {
+      facingMode: state.facingMode,
+      width: { ideal: isPortrait ? short : long },
+      height: { ideal: isPortrait ? long : short },
+      aspectRatio: { ideal: isPortrait ? short / long : long / short }
+    };
+  }
+
   async function startCamera(){
     stopCameraStream();
     if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
@@ -536,7 +547,7 @@
     }
     try{
       cameraStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: state.facingMode },
+        video: videoConstraintsForScreen(),
         audio: true
       });
       cameraVideo.srcObject = cameraStream;
@@ -548,6 +559,15 @@
       return false;
     }
   }
+
+  // re-acquire the camera stream on rotation so the recorded video matches the
+  // phone's current orientation instead of keeping the aspect ratio it opened with
+  let orientationRestartTimer = null;
+  window.addEventListener('resize', () => {
+    if(!state.cameraOn || !cameraStream || state.recording) return;
+    clearTimeout(orientationRestartTimer);
+    orientationRestartTimer = setTimeout(() => { startCamera(); }, 400);
+  });
 
   function stopCameraStream(){
     if(cameraStream){
