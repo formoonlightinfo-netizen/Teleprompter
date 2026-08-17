@@ -153,16 +153,103 @@
   #camera-video.mirror-preview{transform:scaleX(-1);}
   .camera-dim{
     position:absolute; inset:0;
-    background:rgba(0,0,0,.32);
+    background:rgba(0,0,0,.08);
     display:none;
     pointer-events:none;
     z-index:1;
   }
   #prompter-screen.camera-mode #camera-video,
   #prompter-screen.camera-mode .camera-dim{display:block;}
-  #prompter-screen.camera-mode #reader{background:transparent; position:relative; z-index:1;}
   #prompter-screen:not(.camera-mode) #camera-video,
   #prompter-screen:not(.camera-mode) .camera-dim{display:none;}
+
+  /* floating, draggable prompter box (camera mode only) */
+  #prompter-screen.camera-mode #reader{
+    position:absolute;
+    top:12%; left:6%; right:6%; bottom:auto;
+    height:28vh; max-height:46vh;
+    flex:none;
+    background:rgba(15,15,17,.62);
+    border-radius:18px;
+    border:1px solid rgba(255,255,255,.14);
+    box-shadow:0 8px 24px rgba(0,0,0,.35);
+    z-index:2;
+    touch-action:pan-y;
+  }
+  #prompter-screen.camera-mode #reader-inner{
+    padding:34px 16px 16px;
+  }
+  #prompter-screen.camera-mode #prompter-text{
+    text-align:left;
+  }
+  #prompter-screen.camera-mode #reader.box-collapsed{
+    height:34px; overflow:hidden;
+  }
+  #prompter-screen.camera-mode .center-line{ display:none; }
+
+  #box-header{
+    display:none;
+    position:absolute; top:0; left:0; right:0; height:32px;
+    align-items:center; justify-content:space-between; gap:8px;
+    padding:4px 8px;
+    z-index:3;
+    cursor:grab;
+    background:linear-gradient(rgba(0,0,0,.28), transparent);
+    border-radius:18px 18px 0 0;
+  }
+  #prompter-screen.camera-mode #box-header{ display:flex; }
+  #box-header .drag-grip{
+    flex:1; height:4px; background:rgba(255,255,255,.5); border-radius:4px;
+  }
+  #box-header button{
+    width:24px; height:24px; border-radius:50%; flex-shrink:0;
+    background:rgba(0,0,0,.45); border:1px solid rgba(255,255,255,.2); color:#fff; font-size:12px;
+    display:flex; align-items:center; justify-content:center; cursor:pointer;
+  }
+
+  #camera-bar{
+    display:none;
+    position:absolute; left:0; right:0; bottom:0;
+    padding:14px calc(var(--safe-right) + 28px) calc(var(--safe-bottom) + 20px) calc(var(--safe-left) + 28px);
+    align-items:center; justify-content:space-between;
+    z-index:3;
+    background:linear-gradient(transparent, rgba(0,0,0,.6) 55%);
+  }
+  #prompter-screen.camera-mode #camera-bar{ display:flex; }
+  #prompter-screen.camera-mode #controls{ display:none; }
+
+  #cam-record-btn{
+    width:72px; height:72px; border-radius:50%;
+    background:var(--danger); border:4px solid #fff;
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
+  }
+  #cam-record-btn .dot{ width:26px; height:26px; border-radius:50%; background:#fff; transition:border-radius .15s ease, width .15s ease, height .15s ease; }
+  #cam-record-btn.recording .dot{ border-radius:6px; width:22px; height:22px; }
+
+  .cam-side-btn{
+    width:48px; height:48px; border-radius:50%;
+    background:rgba(20,20,20,.55); border:1px solid rgba(255,255,255,.18);
+    color:#fff; font-size:18px;
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
+  }
+  .cam-side-btn:disabled{ opacity:.35; }
+  .cam-side-btn-spacer{ width:48px; }
+
+  #settings-popover{
+    display:none;
+    position:absolute;
+    left:50%; bottom:calc(var(--safe-bottom) + 108px);
+    transform:translateX(-50%);
+    z-index:4;
+    background:rgba(20,20,20,.94);
+    border:1px solid rgba(255,255,255,.15);
+    border-radius:16px;
+    padding:14px;
+    width:min(320px, 82vw);
+  }
+  #settings-popover.open{ display:block; }
 
   #rec-indicator{
     display:none;
@@ -223,18 +310,18 @@
     display:flex; flex-direction:column; gap:8px;
   }
   .ctrl-sliders{
-    display:flex; gap:10px;
+    display:flex; gap:10px; min-width:0;
   }
   .ctrl-slider{
-    flex:1;
+    flex:1; min-width:0;
     background:rgba(20,20,20,.65);
     border:1px solid rgba(255,255,255,.12);
     border-radius:12px;
     padding:6px 12px;
     display:flex; align-items:center; gap:8px;
   }
-  .ctrl-slider span.lbl{font-size:11px; color:var(--muted); width:34px;}
-  .ctrl-slider input[type=range]{margin:0;}
+  .ctrl-slider span.lbl{font-size:11px; color:var(--muted); width:34px; flex-shrink:0;}
+  .ctrl-slider input[type=range]{margin:0; min-width:0;}
   .ctrl-buttons{
     display:flex; align-items:center; justify-content:center; gap:12px; row-gap:10px; flex-wrap:wrap;
   }
@@ -336,6 +423,11 @@
     <video id="camera-video" playsinline autoplay muted></video>
     <div class="camera-dim"></div>
     <div id="reader">
+      <div id="box-header">
+        <button id="box-hide-btn" title="Nascondi/mostra testo">👁</button>
+        <div class="drag-grip"></div>
+        <button id="box-settings-btn" title="Impostazioni">⚙</button>
+      </div>
       <div id="reader-inner">
         <div id="prompter-text"></div>
       </div>
@@ -363,11 +455,33 @@
       <div class="ctrl-buttons">
         <button class="side-btn" id="mirror-h-btn" title="Specchio orizzontale">⇋</button>
         <button class="side-btn" id="mirror-v-btn" title="Specchio verticale">⇵</button>
-        <button class="side-btn" id="switch-camera-btn" title="Cambia fotocamera" hidden>🔄</button>
         <button id="play-btn" title="Play/Pausa">▶</button>
         <button class="side-btn" id="fullscreen-btn" title="Schermo intero">⛶</button>
         <button class="side-btn" id="hide-ui-btn" title="Nascondi controlli">👁</button>
       </div>
+    </div>
+
+    <div id="settings-popover">
+      <div class="ctrl-sliders">
+        <div class="ctrl-slider">
+          <span class="lbl">Vel.</span>
+          <input type="range" id="pb-speed" min="1" max="20" step="1" value="5">
+        </div>
+        <div class="ctrl-slider">
+          <span class="lbl">Testo</span>
+          <input type="range" id="pb-size" min="18" max="120" step="1" value="42">
+        </div>
+      </div>
+      <div class="toggle-row" style="margin-top:10px;">
+        <div class="toggle-btn" id="pb-mirror-h">Specchio orizz.</div>
+        <div class="toggle-btn" id="pb-mirror-v">Specchio vert.</div>
+      </div>
+    </div>
+
+    <div id="camera-bar">
+      <button class="cam-side-btn" id="switch-camera-btn" title="Cambia fotocamera">🔄</button>
+      <button id="cam-record-btn" title="Registra"><span class="dot"></span></button>
+      <div class="cam-side-btn-spacer"></div>
     </div>
   </div>
 
@@ -411,6 +525,15 @@
   const switchCameraBtn = $('switch-camera-btn');
   const recIndicator = $('rec-indicator');
   const recTimeEl = $('rec-time');
+  const boxHeader = $('box-header');
+  const boxHideBtn = $('box-hide-btn');
+  const boxSettingsBtn = $('box-settings-btn');
+  const settingsPopover = $('settings-popover');
+  const pbSpeed = $('pb-speed');
+  const pbSize = $('pb-size');
+  const pbMirrorH = $('pb-mirror-h');
+  const pbMirrorV = $('pb-mirror-v');
+  const camRecordBtn = $('cam-record-btn');
 
   const state = {
     speed: 5,
@@ -470,8 +593,13 @@
     facingModeRow.hidden = !state.cameraOn;
     facingUserBtn.classList.toggle('on', state.facingMode === 'user');
     facingEnvBtn.classList.toggle('on', state.facingMode === 'environment');
-    switchCameraBtn.hidden = !state.cameraOn;
     playBtn.classList.toggle('rec-mode', state.cameraOn);
+
+    pbSpeed.value = state.speed;
+    pbSize.value = state.size;
+    pbMirrorH.classList.toggle('on', state.mirrorH);
+    pbMirrorV.classList.toggle('on', state.mirrorV);
+
     updateMainButtonIcon();
   }
 
@@ -493,6 +621,61 @@
   liveSize.addEventListener('input', () => { state.size = +liveSize.value; syncUI(); saveSettings(); });
   mirrorHBtn.addEventListener('click', () => { state.mirrorH = !state.mirrorH; syncUI(); saveSettings(); });
   mirrorVBtn.addEventListener('click', () => { state.mirrorV = !state.mirrorV; syncUI(); saveSettings(); });
+
+  // ---------- floating prompter box (camera mode) ----------
+  pbSpeed.addEventListener('input', () => { state.speed = +pbSpeed.value; syncUI(); saveSettings(); });
+  pbSize.addEventListener('input', () => { state.size = +pbSize.value; syncUI(); saveSettings(); });
+  pbMirrorH.addEventListener('click', () => { state.mirrorH = !state.mirrorH; syncUI(); saveSettings(); });
+  pbMirrorV.addEventListener('click', () => { state.mirrorV = !state.mirrorV; syncUI(); saveSettings(); });
+
+  boxHideBtn.addEventListener('click', () => {
+    reader.classList.toggle('box-collapsed');
+  });
+  boxSettingsBtn.addEventListener('click', () => {
+    settingsPopover.classList.toggle('open');
+  });
+  camRecordBtn.addEventListener('click', handleMainButton);
+
+  // drag the box around the camera preview by its header
+  (function setupBoxDrag(){
+    let dragging = false, startX = 0, startY = 0, startLeft = 0, startTop = 0;
+    boxHeader.addEventListener('pointerdown', (e) => {
+      if(!prompterScreen.classList.contains('camera-mode')) return;
+      if(e.target.closest('button')) return; // don't hijack the hide/settings buttons' own click
+      dragging = true;
+      boxHeader.setPointerCapture(e.pointerId);
+      const r = reader.getBoundingClientRect();
+      startX = e.clientX; startY = e.clientY;
+      startLeft = r.left; startTop = r.top;
+      reader.style.width = r.width + 'px';
+      reader.style.right = 'auto';
+      reader.style.left = startLeft + 'px';
+      reader.style.top = startTop + 'px';
+    });
+    boxHeader.addEventListener('pointermove', (e) => {
+      if(!dragging) return;
+      const dx = e.clientX - startX, dy = e.clientY - startY;
+      const bw = reader.offsetWidth, bh = reader.offsetHeight;
+      let nl = startLeft + dx, nt = startTop + dy;
+      nl = Math.max(4, Math.min(window.innerWidth - bw - 4, nl));
+      nt = Math.max(4, Math.min(window.innerHeight - bh - 4, nt));
+      reader.style.left = nl + 'px';
+      reader.style.top = nt + 'px';
+    });
+    function endDrag(e){
+      if(!dragging) return;
+      dragging = false;
+      try{ boxHeader.releasePointerCapture(e.pointerId); }catch(_){}
+    }
+    boxHeader.addEventListener('pointerup', endDrag);
+    boxHeader.addEventListener('pointercancel', endDrag);
+  })();
+
+  function resetBoxPosition(){
+    reader.style.left = ''; reader.style.top = ''; reader.style.right = ''; reader.style.width = '';
+    reader.classList.remove('box-collapsed');
+    settingsPopover.classList.remove('open');
+  }
 
   // ---------- wake lock ----------
   // held while reading OR recording, so pausing the scroll (or the script
@@ -536,7 +719,7 @@
 
   function videoConstraintsForScreen(){
     const isPortrait = window.innerHeight >= window.innerWidth;
-    const long = 1920, short = 1080;
+    const long = 1280, short = 720;
     return {
       facingMode: state.facingMode,
       width: { ideal: isPortrait ? short : long },
@@ -574,6 +757,12 @@
     if(!state.cameraOn || !cameraStream || state.recording) return;
     clearTimeout(orientationRestartTimer);
     orientationRestartTimer = setTimeout(() => { startCamera(); }, 400);
+  });
+
+  // dragged box position is screen-relative: snap it back to the default
+  // spot on rotation instead of letting it end up off-screen
+  window.addEventListener('resize', () => {
+    if(prompterScreen.classList.contains('camera-mode')) resetBoxPosition();
   });
 
   function stopCameraStream(){
@@ -712,6 +901,7 @@
     } else {
       playBtn.textContent = state.playing ? '❚❚' : '▶';
     }
+    camRecordBtn.classList.toggle('recording', state.recording);
   }
 
   function play(){
@@ -749,8 +939,9 @@
     updateProgress();
   });
 
-  // tap on text area toggles play/pause too
+  // tap on text area toggles play/pause too (ignore taps on the box header controls)
   reader.addEventListener('click', (e) => {
+    if(e.target.closest('#box-header')) return;
     togglePlay();
   });
 
@@ -778,6 +969,7 @@
 
     prompterScreen.classList.toggle('camera-mode', state.cameraOn);
     if(state.cameraOn){
+      resetBoxPosition();
       const ok = await startCamera();
       prompterScreen.classList.toggle('camera-mode', state.cameraOn && ok);
       syncUI();
