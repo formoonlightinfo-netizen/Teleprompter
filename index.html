@@ -564,20 +564,24 @@
   let recStartTs = null;
   let recTimerId = null;
 
-  // request width/height/aspectRatio matching the phone's current
-  // orientation - without this the recorded file comes out in whatever
-  // shape the camera defaults to (often landscape) rather than matching how
-  // the phone is actually being held, and ends up looking cropped/cut when
-  // played back. This is unrelated to how close/zoomed-in the picture looks.
+  // No resolution/aspectRatio constraints: let the camera pick its own
+  // widest natural framing instead of forcing a crop. Getting the exact
+  // output shape right is handled separately below by drawing the video
+  // onto a canvas at record time, so the camera stream itself doesn't need
+  // to match the screen orientation.
   function videoConstraintsForScreen(){
-    const isPortrait = window.innerHeight >= window.innerWidth;
-    const long = 1280, short = 720;
-    return {
-      facingMode: state.facingMode,
-      width: { ideal: isPortrait ? short : long },
-      height: { ideal: isPortrait ? long : short },
-      aspectRatio: { ideal: isPortrait ? short / long : long / short }
-    };
+    return { facingMode: state.facingMode };
+  }
+
+  // make sure the video element actually has decoded pixel data (videoWidth
+  // > 0) before we size/draw the recording canvas from it
+  function waitForVideoReady(){
+    if(cameraVideo.videoWidth > 0) return Promise.resolve();
+    return new Promise((resolve) => {
+      const done = () => { cameraVideo.removeEventListener('loadeddata', done); resolve(); };
+      cameraVideo.addEventListener('loadeddata', done);
+      setTimeout(done, 1500); // fallback in case the event never fires
+    });
   }
 
   async function startCamera(){
@@ -594,11 +598,56 @@
       cameraVideo.srcObject = cameraStream;
       cameraVideo.classList.toggle('mirror-preview', state.facingMode === 'user');
       await requestWidestZoom();
+      await waitForVideoReady();
+      setupRecordCanvas();
       return true;
     }catch(e){
       alert('Impossibile accedere alla fotocamera o al microfono. Controlla i permessi del browser per questo sito.');
       return false;
     }
+  }
+
+  // ---------- record-time canvas pipeline ----------
+  // The camera's raw stream is displayed directly (mirrored for a natural
+  // selfie view), but what actually gets *recorded* is a canvas that we
+  // redraw every frame: cropped to the phone's current orientation (so the
+  // saved file is never the wrong shape) and always drawn un-mirrored (so
+  // the saved file always reads correctly, regardless of the mirrored
+  // preview). The zoom slider crops this same canvas draw, so what's
+  // recorded always matches what's on screen.
+  let recordCanvas = null, recordCtx = null, canvasStream = null, drawRafId = null;
+
+  function setupRecordCanvas(){
+    const isPortrait = window.innerHeight >= window.innerWidth;
+    if(!recordCanvas){
+      recordCanvas = document.createElement('canvas');
+      recordCtx = recordCanvas.getContext('2d');
+    }
+    recordCanvas.width = isPortrait ? 720 : 1280;
+    recordCanvas.height = isPortrait ? 1280 : 720;
+  }
+
+  function computeCoverCrop(vw, vh, targetAspect, zoom){
+    let cropW, cropH;
+    if(vw / vh > targetAspect){ cropH = vh; cropW = vh * targetAspect; }
+    else { cropW = vw; cropH = vw / targetAspect; }
+    cropW /= zoom; cropH /= zoom;
+    return { sx: (vw - cropW) / 2, sy: (vh - cropH) / 2, sw: cropW, sh: cropH };
+  }
+
+  function startDrawLoop(){
+    if(drawRafId) return;
+    function draw(){
+      if(recordCtx && cameraVideo.videoWidth){
+        const c = computeCoverCrop(cameraVideo.videoWidth, cameraVideo.videoHeight, recordCanvas.width / recordCanvas.height, state.zoom);
+        recordCtx.drawImage(cameraVideo, c.sx, c.sy, c.sw, c.sh, 0, 0, recordCanvas.width, recordCanvas.height);
+      }
+      drawRafId = requestAnimationFrame(draw);
+    }
+    drawRafId = requestAnimationFrame(draw);
+  }
+  function stopDrawLoop(){
+    if(drawRafId){ cancelAnimationFrame(drawRafId); drawRafId = null; }
   }
 
   // some Android/Chrome cameras start already zoomed in past their widest
@@ -617,9 +666,14 @@
   }
 
   function stopCameraStream(){
+    stopDrawLoop();
     if(cameraStream){
       cameraStream.getTracks().forEach((t) => t.stop());
       cameraStream = null;
+    }
+    if(canvasStream){
+      canvasStream.getTracks().forEach((t) => t.stop());
+      canvasStream = null;
     }
     cameraVideo.srcObject = null;
   }
@@ -669,13 +723,21 @@
   }
 
   function startRecording(){
-    if(!cameraStream || !window.MediaRecorder) return;
+    if(!cameraStream || !window.MediaRecorder || !recordCanvas) return;
     recordedChunks = [];
+
+    startDrawLoop();
+    if(!canvasStream) canvasStream = recordCanvas.captureStream(30);
+    canvasStream.getAudioTracks().forEach((t) => canvasStream.removeTrack(t));
+    const audioTrack = cameraStream.getAudioTracks()[0];
+    if(audioTrack) canvasStream.addTrack(audioTrack);
+
     const mimeType = pickMimeType();
     try{
-      mediaRecorder = mimeType ? new MediaRecorder(cameraStream, { mimeType }) : new MediaRecorder(cameraStream);
+      mediaRecorder = mimeType ? new MediaRecorder(canvasStream, { mimeType }) : new MediaRecorder(canvasStream);
     }catch(e){
       alert('La registrazione video non è supportata su questo browser.');
+      stopDrawLoop();
       return;
     }
     mediaRecorder.ondataavailable = (e) => { if(e.data && e.data.size > 0) recordedChunks.push(e.data); };
@@ -694,6 +756,7 @@
 
   function stopRecording(){
     if(mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+    stopDrawLoop();
     state.recording = false;
     recIndicator.classList.remove('on');
     updateMainButtonIcon();
