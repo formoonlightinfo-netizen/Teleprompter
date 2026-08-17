@@ -552,11 +552,27 @@
       });
       cameraVideo.srcObject = cameraStream;
       cameraVideo.classList.toggle('mirror-preview', state.facingMode === 'user');
+      await requestWidestZoom();
       return true;
     }catch(e){
       alert('Impossibile accedere alla fotocamera o al microfono. Controlla i permessi del browser per questo sito.');
       return false;
     }
+  }
+
+  // some Android/Chrome cameras start already zoomed in past their widest
+  // point; where the hardware exposes a zoom capability, pull it back to its
+  // minimum (widest) setting. No-op where the browser doesn't expose this
+  // (notably iOS Safari, which has no web API for camera zoom at all).
+  async function requestWidestZoom(){
+    try{
+      const track = cameraStream && cameraStream.getVideoTracks()[0];
+      if(!track || !track.getCapabilities) return;
+      const caps = track.getCapabilities();
+      if(caps && caps.zoom && typeof caps.zoom.min === 'number'){
+        await track.applyConstraints({ advanced: [{ zoom: caps.zoom.min }] });
+      }
+    }catch(e){ /* zoom control not supported here, ignore */ }
   }
 
   function stopCameraStream(){
