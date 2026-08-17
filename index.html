@@ -762,20 +762,21 @@
 
   const QUALITY_SHORT_EDGE = { hd: 720, fhd: 1080, '4k': 2160 };
 
-  // No width/height/aspectRatio constraints: requesting a specific capture
-  // resolution pushes some phone cameras (notably iOS Safari's front camera)
-  // into a tighter, more zoomed-in capture mode than their normal default,
-  // because the OS picks a cropped sensor region to hit that exact size
-  // instead of using its standard full field of view. Letting the camera
-  // pick its own framing avoids that entirely. The "quality" setting still
-  // works: it controls the output canvas size (and bitrate) that the source
-  // frames get drawn/scaled into at record time, not what we ask the camera
-  // for.
+  // No width/height/aspectRatio/frameRate constraints at all: requesting a
+  // specific capture resolution pushes some phone cameras (notably iOS
+  // Safari's front camera) into a tighter, more zoomed-in capture mode than
+  // their normal default, because the OS picks a cropped sensor region to
+  // hit that exact size instead of using its standard full field of view —
+  // and pairing an ideal frameRate with no resolution hint risks the same
+  // kind of unstable/unsupported capture mode on some Android cameras,
+  // which can silently produce a broken stream (recording finishes with
+  // zero data, so no save prompt ever appears). Letting the camera pick its
+  // own framing and frame rate avoids all of that. The "quality"/"fps"
+  // settings still work as intended: they control the output canvas size
+  // and the recorded stream's frame rate (via captureStream below) — i.e.
+  // what we produce from the source frames, not what we ask the camera for.
   function videoConstraintsForScreen(){
-    return {
-      facingMode: state.facingMode,
-      frameRate: { ideal: state.fps }
-    };
+    return { facingMode: state.facingMode };
   }
 
   // make sure the video element actually has decoded pixel data (videoWidth
@@ -973,6 +974,9 @@
     }
     mediaRecorder.ondataavailable = (e) => { if(e.data && e.data.size > 0) recordedChunks.push(e.data); };
     mediaRecorder.onstop = handleRecordingStop;
+    mediaRecorder.onerror = (e) => {
+      alert('La registrazione si è interrotta per un errore: ' + ((e.error && e.error.message) || 'errore sconosciuto') + '. Riprova.');
+    };
     mediaRecorder.start(1000);
     state.recording = true;
     promptText.contentEditable = 'false';
@@ -1009,7 +1013,10 @@
   // real button the user taps, so the save action has its own fresh gesture.
   let pendingVideo = null;
   function handleRecordingStop(){
-    if(recordedChunks.length === 0) return;
+    if(recordedChunks.length === 0){
+      alert('La registrazione non ha prodotto nessun dato video, quindi non c\'è niente da salvare. Riprova; se succede di nuovo prova a cambiare la qualità o i fotogrammi al minimo (HD, 24fps).');
+      return;
+    }
     const mimeType = (mediaRecorder && mediaRecorder.mimeType) || 'video/webm';
     const blob = new Blob(recordedChunks, { type: mimeType });
     const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
