@@ -495,6 +495,8 @@
   mirrorVBtn.addEventListener('click', () => { state.mirrorV = !state.mirrorV; syncUI(); saveSettings(); });
 
   // ---------- wake lock ----------
+  // held while reading OR recording, so pausing the scroll (or the script
+  // ending) never lets the screen lock mid-recording and kill the camera
   let wakeLock = null;
   async function requestWakeLock(){
     try{
@@ -506,8 +508,13 @@
   function releaseWakeLock(){
     if(wakeLock){ wakeLock.release().catch(()=>{}); wakeLock = null; }
   }
+  function syncWakeLock(){
+    const shouldHold = state.playing || state.recording;
+    if(shouldHold && !wakeLock) requestWakeLock();
+    else if(!shouldHold && wakeLock) releaseWakeLock();
+  }
   document.addEventListener('visibilitychange', () => {
-    if(document.visibilityState === 'visible' && state.playing) requestWakeLock();
+    if(document.visibilityState === 'visible' && (state.playing || state.recording)) requestWakeLock();
   });
 
   // ---------- fullscreen ----------
@@ -622,11 +629,12 @@
     }
     mediaRecorder.ondataavailable = (e) => { if(e.data && e.data.size > 0) recordedChunks.push(e.data); };
     mediaRecorder.onstop = handleRecordingStop;
-    mediaRecorder.start();
+    mediaRecorder.start(1000);
     state.recording = true;
     recIndicator.classList.add('on');
     playBtn.classList.add('recording');
     updateMainButtonIcon();
+    syncWakeLock();
     recStartTs = Date.now();
     recTimeEl.textContent = '00:00';
     recTimerId = setInterval(updateRecTimer, 250);
@@ -639,6 +647,7 @@
     recIndicator.classList.remove('on');
     playBtn.classList.remove('recording');
     updateMainButtonIcon();
+    syncWakeLock();
     clearInterval(recTimerId);
     switchCameraBtn.disabled = false;
   }
@@ -710,7 +719,7 @@
     state.playing = true;
     updateMainButtonIcon();
     lastTs = null;
-    requestWakeLock();
+    syncWakeLock();
     rafId = requestAnimationFrame(step);
   }
   function pause(){
@@ -718,7 +727,7 @@
     updateMainButtonIcon();
     if(rafId) cancelAnimationFrame(rafId);
     rafId = null;
-    releaseWakeLock();
+    syncWakeLock();
   }
   function togglePlay(){ state.playing ? pause() : play(); }
 
