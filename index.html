@@ -171,10 +171,26 @@
   /* ---------- bottom camera bar ---------- */
   #camera-bar{
     position:absolute; left:0; right:0; bottom:0;
-    padding:14px calc(var(--safe-right) + 28px) calc(var(--safe-bottom) + 20px) calc(var(--safe-left) + 28px);
-    display:flex; align-items:center; justify-content:space-between;
+    padding:10px 0 calc(var(--safe-bottom) + 18px) 0;
+    display:flex; flex-direction:column; gap:10px;
     z-index:4;
     background:linear-gradient(transparent, rgba(0,0,0,.6) 55%);
+  }
+  #zoom-row{
+    align-self:center;
+    width:min(260px, 80vw);
+    display:flex; align-items:center; gap:8px;
+    background:rgba(20,20,20,.55);
+    border:1px solid rgba(255,255,255,.18);
+    border-radius:20px;
+    padding:4px 14px;
+  }
+  #zoom-row .zoom-icon{ font-size:14px; flex-shrink:0; }
+  #zoom-row input[type=range]{ flex:1; min-width:0; accent-color:var(--accent); height:30px; margin:0; }
+
+  #camera-buttons-row{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:0 calc(var(--safe-right) + 28px) 0 calc(var(--safe-left) + 28px);
   }
   #cam-record-btn{
     width:72px; height:72px; border-radius:50%;
@@ -193,7 +209,9 @@
     cursor:pointer;
   }
   .cam-side-btn:disabled{ opacity:.35; }
-  .cam-side-btn-spacer{ width:48px; }
+  #mirror-toggle-btn.active{
+    background:var(--accent); border-color:var(--accent); color:#161616;
+  }
 
   /* ---------- save banner ---------- */
   #save-banner{
@@ -242,11 +260,6 @@
   }
   .ctrl-row span.lbl{font-size:12px; color:var(--muted); width:46px; flex-shrink:0;}
   .ctrl-row input[type=range]{flex:1; min-width:0; accent-color:var(--accent); height:34px; margin:0;}
-  #mirror-toggle-btn{
-    flex:1; border:none; border-radius:8px; padding:8px 10px;
-    background:rgba(255,255,255,.12); color:var(--text); font-size:13px; font-weight:600; cursor:pointer;
-  }
-  #mirror-toggle-btn.active{ background:var(--accent); color:#161616; }
 
   /* ---------- start overlay ---------- */
   #start-overlay{
@@ -303,10 +316,6 @@
 
   <div id="settings-popover">
     <div class="ctrl-row">
-      <span class="lbl">Zoom</span>
-      <input type="range" id="pb-zoom" min="1" max="2.2" step="0.05" value="1">
-    </div>
-    <div class="ctrl-row">
       <span class="lbl">Vel.</span>
       <input type="range" id="pb-speed" min="1" max="20" step="1" value="5">
     </div>
@@ -314,16 +323,18 @@
       <span class="lbl">Testo</span>
       <input type="range" id="pb-size" min="14" max="80" step="1" value="26">
     </div>
-    <div class="ctrl-row">
-      <span class="lbl">Salva</span>
-      <button id="mirror-toggle-btn" type="button">Specchia video salvato</button>
-    </div>
   </div>
 
   <div id="camera-bar">
-    <button class="cam-side-btn" id="switch-camera-btn" title="Cambia fotocamera">🔄</button>
-    <button id="cam-record-btn" title="Registra"><span class="dot"></span></button>
-    <div class="cam-side-btn-spacer"></div>
+    <div id="zoom-row">
+      <span class="zoom-icon">🔍</span>
+      <input type="range" id="pb-zoom" min="1" max="2.2" step="0.05" value="1">
+    </div>
+    <div id="camera-buttons-row">
+      <button class="cam-side-btn" id="switch-camera-btn" title="Cambia fotocamera">🔄</button>
+      <button id="cam-record-btn" title="Registra"><span class="dot"></span></button>
+      <button class="cam-side-btn" id="mirror-toggle-btn" type="button" title="Specchia video salvato">🪞</button>
+    </div>
   </div>
 
   <div id="save-banner">
