@@ -560,12 +560,10 @@
   });
 
   // ---------- video quality / frame rate ----------
-  // Safe to request an ideal source resolution/frame rate now (unlike
-  // earlier attempts): the canvas pipeline always normalizes whatever the
-  // camera returns into the correct cropped shape, so this can't reintroduce
-  // the old wrong-crop bug — it only asks the camera to deliver more detail
-  // when available. Applied live if not recording; if recording, it takes
-  // effect on the next take so the current one isn't interrupted.
+  // Resolution isn't requested from the camera itself (see
+  // videoConstraintsForScreen below) — only fps is. Applied live if not
+  // recording; if recording, it takes effect on the next take so the
+  // current one isn't interrupted.
   let qualityCloseTimer = null;
   function scheduleQualityClose(){
     clearTimeout(qualityCloseTimer);
