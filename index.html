@@ -764,19 +764,18 @@
 
   const QUALITY_SHORT_EDGE = { hd: 720, fhd: 1080, '4k': 2160 };
 
-  // "ideal" (never exact/min) resolution + frame rate hints, so the source
-  // can supply enough detail for the chosen quality setting. These never
-  // force a crop: the camera can return any aspect ratio it wants, and the
-  // canvas pipeline below normalizes whatever comes back into the correct
-  // shape at record time regardless.
+  // No width/height/aspectRatio constraints: requesting a specific capture
+  // resolution pushes some phone cameras (notably iOS Safari's front camera)
+  // into a tighter, more zoomed-in capture mode than their normal default,
+  // because the OS picks a cropped sensor region to hit that exact size
+  // instead of using its standard full field of view. Letting the camera
+  // pick its own framing avoids that entirely. The "quality" setting still
+  // works: it controls the output canvas size (and bitrate) that the source
+  // frames get drawn/scaled into at record time, not what we ask the camera
+  // for.
   function videoConstraintsForScreen(){
-    const isPortrait = window.innerHeight >= window.innerWidth;
-    const shortEdge = QUALITY_SHORT_EDGE[state.quality] || 720;
-    const longEdge = Math.round(shortEdge * 16 / 9);
     return {
       facingMode: state.facingMode,
-      width: { ideal: isPortrait ? shortEdge : longEdge },
-      height: { ideal: isPortrait ? longEdge : shortEdge },
       frameRate: { ideal: state.fps }
     };
   }
