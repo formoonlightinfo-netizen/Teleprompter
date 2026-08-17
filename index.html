@@ -237,24 +237,26 @@
   #quality-pop{
     display:none;
     position:absolute;
-    bottom:58px; left:50%;
-    transform:translateX(-50%);
-    width:76px;
-    background:rgba(20,20,20,.92);
+    bottom:58px; right:-6px; left:auto;
+    width:172px;
+    background:rgba(20,20,20,.94);
     border:1px solid rgba(255,255,255,.18);
     border-radius:16px;
-    padding:8px;
+    padding:10px;
     flex-direction:column;
-    gap:6px;
+    gap:10px;
     z-index:6;
   }
   #quality-pop.open{ display:flex; }
-  #quality-pop button{
-    border:none; border-radius:8px; padding:8px 4px;
+  .qp-group{ display:flex; flex-direction:column; gap:6px; }
+  .qp-label{ font-size:11px; color:var(--muted); font-weight:600; padding-left:2px; }
+  .qp-row{ display:flex; gap:6px; }
+  .qp-row button{
+    flex:1; border:none; border-radius:8px; padding:8px 4px;
     background:rgba(255,255,255,.1); color:var(--text); font-size:12px; font-weight:700; cursor:pointer;
   }
-  #quality-pop button.active{ background:var(--accent); color:#161616; }
-  #quality-pop button:disabled{ opacity:.35; }
+  .qp-row button.active{ background:var(--accent); color:#161616; }
+  .qp-row button:disabled{ opacity:.35; }
 
   /* ---------- save banner ---------- */
   #save-banner{
@@ -383,14 +385,6 @@
       <span class="lbl">Testo</span>
       <input type="range" id="pb-size" min="14" max="80" step="1" value="26">
     </div>
-    <div class="ctrl-row">
-      <span class="lbl">FPS</span>
-      <div class="seg" id="fps-seg">
-        <button type="button" data-val="24">24</button>
-        <button type="button" data-val="30">30</button>
-        <button type="button" data-val="60">60</button>
-      </div>
-    </div>
   </div>
 
   <div id="camera-bar">
@@ -409,9 +403,29 @@
         <button class="cam-side-btn" id="countdown-btn" type="button" title="Timer">Off</button>
         <div id="quality-control">
           <div id="quality-pop">
-            <button type="button" data-val="4k">4K</button>
-            <button type="button" data-val="fhd">FHD</button>
-            <button type="button" data-val="hd">HD</button>
+            <div class="qp-group">
+              <span class="qp-label">Risoluzione</span>
+              <div class="qp-row">
+                <button type="button" data-group="quality" data-val="hd">HD</button>
+                <button type="button" data-group="quality" data-val="fhd">FHD</button>
+                <button type="button" data-group="quality" data-val="4k">4K</button>
+              </div>
+            </div>
+            <div class="qp-group">
+              <span class="qp-label">Fotogrammi</span>
+              <div class="qp-row">
+                <button type="button" data-group="fps" data-val="24">24</button>
+                <button type="button" data-group="fps" data-val="30">30</button>
+                <button type="button" data-group="fps" data-val="60">60</button>
+              </div>
+            </div>
+            <div class="qp-group">
+              <span class="qp-label">Colore</span>
+              <div class="qp-row">
+                <button type="button" data-group="color" data-val="sdr">SDR</button>
+                <button type="button" data-group="color" data-val="hdr">HDR</button>
+              </div>
+            </div>
           </div>
           <button class="cam-side-btn" id="quality-btn" type="button" title="Qualità video">HD</button>
         </div>
@@ -474,7 +488,6 @@
   const qualityPop = $('quality-pop');
   const countdownOverlay = $('countdown-overlay');
   const countdownNumber = $('countdown-number');
-  const fpsSeg = $('fps-seg');
 
   const saveBanner = $('save-banner');
   const saveDiscardBtn = $('save-discard-btn');
@@ -492,6 +505,7 @@
     countdown: 0,
     quality: 'hd',
     fps: 30,
+    color: 'sdr',
   };
 
   // ---------- persistence ----------
@@ -508,6 +522,7 @@
       if(typeof s.countdown === 'number') state.countdown = s.countdown;
       if(s.quality) state.quality = s.quality;
       if(s.fps) state.fps = s.fps;
+      if(s.color) state.color = s.color;
       if(typeof s.text === 'string') promptText.innerText = s.text;
     }catch(e){}
   }
@@ -517,7 +532,7 @@
         speed: state.speed, size: state.size, zoom: state.zoom,
         facingMode: state.facingMode,
         countdown: state.countdown,
-        quality: state.quality, fps: state.fps,
+        quality: state.quality, fps: state.fps, color: state.color,
         text: promptText.innerText
       }));
     }catch(e){}
@@ -534,8 +549,9 @@
     countdownBtn.textContent = state.countdown === 0 ? 'Off' : state.countdown + 's';
     countdownBtn.classList.toggle('active', state.countdown > 0);
     qualityBtn.textContent = QUALITY_LABEL[state.quality];
-    qualityPop.querySelectorAll('button').forEach((b) => b.classList.toggle('active', b.dataset.val === state.quality));
-    fpsSeg.querySelectorAll('button').forEach((b) => b.classList.toggle('active', +b.dataset.val === state.fps));
+    qualityPop.querySelectorAll('button[data-group="quality"]').forEach((b) => b.classList.toggle('active', b.dataset.val === state.quality));
+    qualityPop.querySelectorAll('button[data-group="fps"]').forEach((b) => b.classList.toggle('active', +b.dataset.val === state.fps));
+    qualityPop.querySelectorAll('button[data-group="color"]').forEach((b) => b.classList.toggle('active', b.dataset.val === state.color));
     updateMainButtonIcon();
   }
 
@@ -569,23 +585,23 @@
     qualityPop.classList.toggle('open');
     if(qualityPop.classList.contains('open')) scheduleQualityClose();
   });
-  qualityPop.querySelectorAll('button').forEach((btn) => {
+  qualityPop.querySelectorAll('button[data-group]').forEach((btn) => {
     btn.addEventListener('click', () => {
-      state.quality = btn.dataset.val; syncUI(); saveSettings();
-      qualityPop.classList.remove('open');
-      if(!state.recording) startCamera();
+      const group = btn.dataset.group;
+      if(group === 'quality') state.quality = btn.dataset.val;
+      else if(group === 'fps') state.fps = +btn.dataset.val;
+      else if(group === 'color') state.color = btn.dataset.val;
+      syncUI(); saveSettings();
+      scheduleQualityClose();
+      // color is just a draw-time filter (no restart needed); quality/fps
+      // change the getUserMedia constraints, so the camera needs restarting
+      if((group === 'quality' || group === 'fps') && !state.recording) startCamera();
     });
   });
   document.addEventListener('pointerdown', (e) => {
     if(qualityPop.classList.contains('open') && !qualityBtn.parentElement.contains(e.target)){
       qualityPop.classList.remove('open');
     }
-  });
-  fpsSeg.querySelectorAll('button').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      state.fps = +btn.dataset.val; syncUI(); saveSettings();
-      if(!state.recording) startCamera();
-    });
   });
 
   // ---------- zoom: tap to reveal a vertical slider, like a native camera app ----------
@@ -856,9 +872,15 @@
     return { sx: (vw - cropW) / 2, sy: (vh - cropH) / 2, sw: cropW, sh: cropH };
   }
 
+  // "HDR" here means a more vivid color rendering (extra saturation/contrast),
+  // applied at draw time so it's guaranteed to show up identically in the
+  // live preview and in the recorded file. True broadcast HDR capture (wider
+  // dynamic range, 10-bit) isn't something a browser can record via the web
+  // APIs, so this is the closest honest equivalent.
   function drawFrameToCanvas(ctx, canvas){
     if(!cameraVideo.videoWidth) return;
     const c = computeCoverCrop(cameraVideo.videoWidth, cameraVideo.videoHeight, canvas.width / canvas.height, state.zoom);
+    ctx.filter = state.color === 'hdr' ? 'saturate(1.3) contrast(1.08) brightness(1.03)' : 'none';
     ctx.drawImage(cameraVideo, c.sx, c.sy, c.sw, c.sh, 0, 0, canvas.width, canvas.height);
   }
 
@@ -999,7 +1021,6 @@
     switchCameraBtn.disabled = disabled;
     qualityBtn.disabled = disabled;
     qualityPop.querySelectorAll('button').forEach((b) => { b.disabled = disabled; });
-    fpsSeg.querySelectorAll('button').forEach((b) => { b.disabled = disabled; });
   }
 
   // navigator.share()/downloads only work reliably when triggered directly
