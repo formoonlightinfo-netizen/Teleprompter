@@ -192,6 +192,30 @@
   .cam-side-btn:disabled{ opacity:.35; }
   .cam-side-btn-spacer{ width:48px; }
 
+  /* ---------- save banner ---------- */
+  #save-banner{
+    display:none;
+    align-items:center; justify-content:space-between; gap:12px;
+    position:absolute;
+    left:50%; bottom:calc(var(--safe-bottom) + 108px);
+    transform:translateX(-50%);
+    z-index:11;
+    background:rgba(20,20,20,.96);
+    border:1px solid rgba(255,255,255,.18);
+    border-radius:16px;
+    padding:12px 14px;
+    width:min(340px, 88vw);
+    box-shadow:0 8px 24px rgba(0,0,0,.5);
+  }
+  #save-banner.show{ display:flex; }
+  #save-banner span{ font-size:14px; font-weight:600; flex-shrink:0; }
+  .save-banner-buttons{ display:flex; gap:8px; }
+  #save-discard-btn, #save-confirm-btn{
+    border:none; border-radius:10px; padding:9px 12px; font-size:13px; font-weight:600; cursor:pointer;
+  }
+  #save-discard-btn{ background:rgba(255,255,255,.1); color:var(--text); }
+  #save-confirm-btn{ background:var(--accent); color:#161616; }
+
   /* ---------- settings popover ---------- */
   #settings-popover{
     display:none;
@@ -290,6 +314,14 @@
     <div class="cam-side-btn-spacer"></div>
   </div>
 
+  <div id="save-banner">
+    <span>Video pronto</span>
+    <div class="save-banner-buttons">
+      <button id="save-discard-btn" title="Scarta">Scarta</button>
+      <button id="save-confirm-btn" title="Salva">Salva video</button>
+    </div>
+  </div>
+
   <div id="start-overlay">
     <div class="dot"></div>
     <h1>Teleprompter Fotocamera</h1>
@@ -328,6 +360,10 @@
 
   const switchCameraBtn = $('switch-camera-btn');
   const camRecordBtn = $('cam-record-btn');
+
+  const saveBanner = $('save-banner');
+  const saveDiscardBtn = $('save-discard-btn');
+  const saveConfirmBtn = $('save-confirm-btn');
 
   const state = {
     speed: 5,
@@ -528,10 +564,20 @@
   let recStartTs = null;
   let recTimerId = null;
 
-  // no width/height/aspectRatio constraints: let the phone use its own
-  // standard default camera framing instead of forcing a crop to match it
+  // request width/height/aspectRatio matching the phone's current
+  // orientation - without this the recorded file comes out in whatever
+  // shape the camera defaults to (often landscape) rather than matching how
+  // the phone is actually being held, and ends up looking cropped/cut when
+  // played back. This is unrelated to how close/zoomed-in the picture looks.
   function videoConstraintsForScreen(){
-    return { facingMode: state.facingMode };
+    const isPortrait = window.innerHeight >= window.innerWidth;
+    const long = 1280, short = 720;
+    return {
+      facingMode: state.facingMode,
+      width: { ideal: isPortrait ? short : long },
+      height: { ideal: isPortrait ? long : short },
+      aspectRatio: { ideal: isPortrait ? short / long : long / short }
+    };
   }
 
   async function startCamera(){
@@ -656,13 +702,26 @@
     switchCameraBtn.disabled = false;
   }
 
-  async function handleRecordingStop(){
+  // navigator.share()/downloads only work reliably when triggered directly
+  // by a user tap. mediaRecorder.onstop fires asynchronously, well after the
+  // stop button's click has finished, so calling share() from here silently
+  // fails on iOS Safari (expired "user activation") and nothing appears to
+  // happen. Instead, hold onto the finished video and show a banner with a
+  // real button the user taps, so the save action has its own fresh gesture.
+  let pendingVideo = null;
+  function handleRecordingStop(){
     if(recordedChunks.length === 0) return;
     const mimeType = (mediaRecorder && mediaRecorder.mimeType) || 'video/webm';
     const blob = new Blob(recordedChunks, { type: mimeType });
     const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
     const filename = `teleprompter-${Date.now()}.${ext}`;
+    pendingVideo = { blob, filename, mimeType };
+    saveBanner.classList.add('show');
+  }
 
+  async function saveVideoNow(){
+    if(!pendingVideo) return;
+    const { blob, filename, mimeType } = pendingVideo;
     let shared = false;
     try{
       const file = new File([blob], filename, { type: mimeType });
@@ -670,7 +729,7 @@
         await navigator.share({ files: [file], title: 'Video Teleprompter' });
         shared = true;
       }
-    }catch(e){ /* user cancelled share sheet, fall back to download */ }
+    }catch(e){ /* share sheet cancelled or unavailable, fall back to download */ }
 
     if(!shared){
       const url = URL.createObjectURL(blob);
@@ -679,7 +738,15 @@
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 60000);
     }
+    pendingVideo = null;
+    saveBanner.classList.remove('show');
   }
+
+  saveConfirmBtn.addEventListener('click', saveVideoNow);
+  saveDiscardBtn.addEventListener('click', () => {
+    pendingVideo = null;
+    saveBanner.classList.remove('show');
+  });
 
   // ---------- scrolling engine ----------
   let rafId = null;
