@@ -419,13 +419,6 @@
                 <button type="button" data-group="fps" data-val="60">60</button>
               </div>
             </div>
-            <div class="qp-group">
-              <span class="qp-label">Colore</span>
-              <div class="qp-row">
-                <button type="button" data-group="color" data-val="sdr">SDR</button>
-                <button type="button" data-group="color" data-val="hdr">HDR</button>
-              </div>
-            </div>
           </div>
           <button class="cam-side-btn" id="quality-btn" type="button" title="Qualità video">HD</button>
         </div>
@@ -505,7 +498,6 @@
     countdown: 0,
     quality: 'hd',
     fps: 30,
-    color: 'sdr',
   };
 
   // ---------- persistence ----------
@@ -522,7 +514,6 @@
       if(typeof s.countdown === 'number') state.countdown = s.countdown;
       if(s.quality) state.quality = s.quality;
       if(s.fps) state.fps = s.fps;
-      if(s.color) state.color = s.color;
       if(typeof s.text === 'string') promptText.innerText = s.text;
     }catch(e){}
   }
@@ -532,7 +523,7 @@
         speed: state.speed, size: state.size, zoom: state.zoom,
         facingMode: state.facingMode,
         countdown: state.countdown,
-        quality: state.quality, fps: state.fps, color: state.color,
+        quality: state.quality, fps: state.fps,
         text: promptText.innerText
       }));
     }catch(e){}
@@ -551,7 +542,6 @@
     qualityBtn.textContent = QUALITY_LABEL[state.quality];
     qualityPop.querySelectorAll('button[data-group="quality"]').forEach((b) => b.classList.toggle('active', b.dataset.val === state.quality));
     qualityPop.querySelectorAll('button[data-group="fps"]').forEach((b) => b.classList.toggle('active', +b.dataset.val === state.fps));
-    qualityPop.querySelectorAll('button[data-group="color"]').forEach((b) => b.classList.toggle('active', b.dataset.val === state.color));
     updateMainButtonIcon();
   }
 
@@ -590,12 +580,9 @@
       const group = btn.dataset.group;
       if(group === 'quality') state.quality = btn.dataset.val;
       else if(group === 'fps') state.fps = +btn.dataset.val;
-      else if(group === 'color') state.color = btn.dataset.val;
       syncUI(); saveSettings();
       scheduleQualityClose();
-      // color is just a draw-time filter (no restart needed); quality/fps
-      // change the getUserMedia constraints, so the camera needs restarting
-      if((group === 'quality' || group === 'fps') && !state.recording) startCamera();
+      if(!state.recording) startCamera();
     });
   });
   document.addEventListener('pointerdown', (e) => {
@@ -872,15 +859,9 @@
     return { sx: (vw - cropW) / 2, sy: (vh - cropH) / 2, sw: cropW, sh: cropH };
   }
 
-  // "HDR" here means a more vivid color rendering (extra saturation/contrast),
-  // applied at draw time so it's guaranteed to show up identically in the
-  // live preview and in the recorded file. True broadcast HDR capture (wider
-  // dynamic range, 10-bit) isn't something a browser can record via the web
-  // APIs, so this is the closest honest equivalent.
   function drawFrameToCanvas(ctx, canvas){
     if(!cameraVideo.videoWidth) return;
     const c = computeCoverCrop(cameraVideo.videoWidth, cameraVideo.videoHeight, canvas.width / canvas.height, state.zoom);
-    ctx.filter = state.color === 'hdr' ? 'saturate(1.3) contrast(1.08) brightness(1.03)' : 'none';
     ctx.drawImage(cameraVideo, c.sx, c.sy, c.sw, c.sh, 0, 0, canvas.width, canvas.height);
   }
 
