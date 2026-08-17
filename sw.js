@@ -1,4 +1,4 @@
-const CACHE_NAME = 'teleprompter-cache-v1';
+const CACHE_NAME = 'teleprompter-cache-v2';
 const ASSETS = [
   './',
   './index.html',
@@ -24,18 +24,18 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
+  // Network-first: always pick up the latest deployed code when online, so a
+  // pushed fix is never masked by a stale cached page. Cache is only used as
+  // an offline fallback.
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      const fetchPromise = fetch(event.request)
-        .then((response) => {
-          if (response && response.status === 200) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-          }
-          return response;
-        })
-        .catch(() => cached);
-      return cached || fetchPromise;
-    })
+    fetch(event.request)
+      .then((response) => {
+        if (response && response.status === 200) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+        }
+        return response;
+      })
+      .catch(() => caches.match(event.request))
   );
 });
