@@ -109,6 +109,14 @@
     -webkit-user-select:text; user-select:text;
   }
   @media (orientation: landscape){
+    /* In landscape the screen is much wider, so the same left/right % used
+       in portrait makes each line too long to read comfortably while
+       filming. Narrow the box to a centered reading column instead. */
+    #reader{
+      left:50%; right:auto;
+      width:min(58%, 520px);
+      transform:translateX(-50%);
+    }
     #prompter-text{ text-align:center; }
   }
 
