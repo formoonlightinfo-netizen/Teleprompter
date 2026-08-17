@@ -47,7 +47,21 @@
     z-index:0;
   }
   #camera-video.mirror-preview{transform:scaleX(-1) scale(var(--zoom, 1));}
-  #camera-video.beauty{ filter: blur(1.4px) brightness(1.05) contrast(0.96) saturate(1.08); }
+  /* Only blurs what's visually behind this oval (no color/brightness change),
+     approximating "face only" without real face detection. Sized/positioned
+     to line up with the matching clipped blur drawn into the recording
+     canvas, so live preview and saved file match. */
+  #beauty-oval{
+    display:none;
+    position:absolute;
+    left:50%; top:36%;
+    width:46vw; height:57.5vw;
+    transform:translate(-50%,-50%);
+    border-radius:50%;
+    z-index:1;
+    pointer-events:none;
+  }
+  #beauty-oval.on{ display:block; }
   .camera-dim{
     position:absolute; inset:0;
     background:rgba(0,0,0,.1);
@@ -126,16 +140,7 @@
     width:36px; height:4px; background:rgba(255,255,255,.5); border-radius:4px;
   }
 
-  /* ---------- top bar ---------- */
-  #topbar{
-    position:absolute; top:0; left:0; right:0;
-    padding: calc(var(--safe-top) + 8px) calc(var(--safe-right) + 12px) 8px calc(var(--safe-left) + 12px);
-    display:flex; align-items:center; justify-content:space-between;
-    z-index:4;
-    background:linear-gradient(rgba(0,0,0,.65), transparent);
-    pointer-events:none;
-  }
-  #topbar > *{pointer-events:auto;}
+  /* ---------- floating stop button + recording timer ---------- */
   .icon-btn{
     width:40px; height:40px;
     border-radius:50%;
@@ -146,13 +151,20 @@
     font-size:18px;
     cursor:pointer;
   }
-  #progress-wrap{
-    flex:1; margin:0 10px; height:4px; background:rgba(255,255,255,.15); border-radius:4px; overflow:hidden;
+  #stop-btn{
+    position:absolute;
+    top: calc(var(--safe-top) + 10px);
+    left: calc(var(--safe-left) + 12px);
+    z-index:4;
   }
-  #progress-bar{height:100%; width:0%; background:var(--accent);}
 
   #rec-indicator{
     display:none;
+    position:absolute;
+    top: calc(var(--safe-top) + 14px);
+    left:50%;
+    transform:translateX(-50%);
+    z-index:4;
     align-items:center; gap:6px;
     background:rgba(0,0,0,.6);
     border:1px solid rgba(255,77,79,.6);
@@ -198,12 +210,12 @@
     cursor:pointer;
   }
   .cam-side-btn:disabled{ opacity:.35; }
-  #mirror-toggle-btn.active{
+  .cam-side-btn.active{
     background:var(--accent); border-color:var(--accent); color:#161616;
   }
-  #zoom-control{ position:relative; }
-  #zoom-btn{ font-size:13px; font-weight:700; }
-  #zoom-slider-pop{
+  #zoom-control, #beauty-control{ position:relative; }
+  #zoom-btn, #beauty-btn, #countdown-btn{ font-size:13px; font-weight:700; }
+  .vslider-pop{
     display:none;
     position:absolute;
     bottom:58px; left:50%;
@@ -215,8 +227,8 @@
     align-items:center; justify-content:center;
     z-index:6;
   }
-  #zoom-slider-pop.open{ display:flex; }
-  #zoom-slider-pop input[type=range]{
+  .vslider-pop.open{ display:flex; }
+  .vslider-pop input[type=range]{
     width:140px; height:6px;
     transform:rotate(-90deg);
     accent-color:var(--accent);
@@ -270,11 +282,6 @@
   }
   .ctrl-row span.lbl{font-size:12px; color:var(--muted); width:46px; flex-shrink:0;}
   .ctrl-row input[type=range]{flex:1; min-width:0; accent-color:var(--accent); height:34px; margin:0;}
-  .pill-btn{
-    flex:1; border:none; border-radius:8px; padding:8px 10px;
-    background:rgba(255,255,255,.12); color:var(--text); font-size:13px; font-weight:600; cursor:pointer;
-  }
-  .pill-btn.active{ background:var(--accent); color:#161616; }
 
   /* ---------- countdown overlay ---------- */
   #countdown-overlay{
@@ -319,6 +326,7 @@
 <div id="app">
 
   <video id="camera-video" playsinline autoplay muted></video>
+  <div id="beauty-oval"></div>
   <div class="camera-dim"></div>
 
   <div id="reader">
@@ -335,12 +343,8 @@
     </div>
   </div>
 
-  <div id="topbar">
-    <button class="icon-btn" id="stop-btn" title="Ferma">✕</button>
-    <div id="rec-indicator"><span class="rec-dot"></span><span id="rec-time">00:00</span></div>
-    <div id="progress-wrap"><div id="progress-bar"></div></div>
-    <button class="icon-btn" id="restart-btn" title="Riavvia">↺</button>
-  </div>
+  <button class="icon-btn" id="stop-btn" title="Ferma">✕</button>
+  <div id="rec-indicator"><span class="rec-dot"></span><span id="rec-time">00:00</span></div>
 
   <div id="settings-popover">
     <div class="ctrl-row">
@@ -351,14 +355,6 @@
       <span class="lbl">Testo</span>
       <input type="range" id="pb-size" min="14" max="80" step="1" value="26">
     </div>
-    <div class="ctrl-row">
-      <span class="lbl">Timer</span>
-      <button id="countdown-btn" class="pill-btn" type="button">Off</button>
-    </div>
-    <div class="ctrl-row">
-      <span class="lbl">Pelle</span>
-      <button id="beauty-btn" class="pill-btn" type="button">Levigatura pelle</button>
-    </div>
   </div>
 
   <div id="camera-bar">
@@ -366,7 +362,7 @@
       <div class="side-group">
         <button class="cam-side-btn" id="switch-camera-btn" title="Cambia fotocamera">🔄</button>
         <div id="zoom-control">
-          <div id="zoom-slider-pop">
+          <div id="zoom-slider-pop" class="vslider-pop">
             <input type="range" id="pb-zoom" min="1" max="2.2" step="0.05" value="1">
           </div>
           <button class="cam-side-btn" id="zoom-btn" type="button" title="Zoom">1.0x</button>
@@ -374,7 +370,13 @@
       </div>
       <button id="cam-record-btn" title="Registra"><span class="dot"></span></button>
       <div class="side-group">
-        <button class="cam-side-btn" id="mirror-toggle-btn" type="button" title="Specchia video salvato">🪞</button>
+        <button class="cam-side-btn" id="countdown-btn" type="button" title="Timer">Off</button>
+        <div id="beauty-control">
+          <div id="beauty-slider-pop" class="vslider-pop">
+            <input type="range" id="pb-beauty" min="0" max="4" step="0.2" value="0">
+          </div>
+          <button class="cam-side-btn" id="beauty-btn" type="button" title="Levigatura pelle">✨</button>
+        </div>
       </div>
     </div>
   </div>
@@ -415,8 +417,6 @@
   const resizeHandle = $('resize-handle');
 
   const stopBtn = $('stop-btn');
-  const restartBtn = $('restart-btn');
-  const progressBar = $('progress-bar');
   const recIndicator = $('rec-indicator');
   const recTimeEl = $('rec-time');
 
@@ -424,14 +424,16 @@
   const pbZoom = $('pb-zoom');
   const pbSpeed = $('pb-speed');
   const pbSize = $('pb-size');
+  const pbBeauty = $('pb-beauty');
 
   const switchCameraBtn = $('switch-camera-btn');
   const camRecordBtn = $('cam-record-btn');
-  const mirrorToggleBtn = $('mirror-toggle-btn');
   const zoomBtn = $('zoom-btn');
   const zoomSliderPop = $('zoom-slider-pop');
   const countdownBtn = $('countdown-btn');
   const beautyBtn = $('beauty-btn');
+  const beautySliderPop = $('beauty-slider-pop');
+  const beautyOval = $('beauty-oval');
   const countdownOverlay = $('countdown-overlay');
   const countdownNumber = $('countdown-number');
 
@@ -439,7 +441,6 @@
   const saveDiscardBtn = $('save-discard-btn');
   const saveConfirmBtn = $('save-confirm-btn');
 
-  const BEAUTY_FILTER = 'blur(1.4px) brightness(1.05) contrast(0.96) saturate(1.08)';
   const COUNTDOWN_OPTIONS = [0, 3, 10];
 
   const state = {
@@ -449,9 +450,8 @@
     facingMode: 'user',
     playing: false,
     recording: false,
-    mirrorSave: false,
     countdown: 0,
-    beauty: false,
+    beautyAmount: 0,
   };
 
   // ---------- persistence ----------
@@ -465,9 +465,8 @@
       if(s.size) state.size = s.size;
       if(s.zoom) state.zoom = s.zoom;
       if(s.facingMode) state.facingMode = s.facingMode;
-      if(typeof s.mirrorSave === 'boolean') state.mirrorSave = s.mirrorSave;
       if(typeof s.countdown === 'number') state.countdown = s.countdown;
-      if(typeof s.beauty === 'boolean') state.beauty = s.beauty;
+      if(typeof s.beautyAmount === 'number') state.beautyAmount = s.beautyAmount;
       if(typeof s.text === 'string') promptText.innerText = s.text;
     }catch(e){}
   }
@@ -475,8 +474,8 @@
     try{
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
         speed: state.speed, size: state.size, zoom: state.zoom,
-        facingMode: state.facingMode, mirrorSave: state.mirrorSave,
-        countdown: state.countdown, beauty: state.beauty,
+        facingMode: state.facingMode,
+        countdown: state.countdown, beautyAmount: state.beautyAmount,
         text: promptText.innerText
       }));
     }catch(e){}
@@ -486,14 +485,17 @@
     pbSpeed.value = state.speed;
     pbSize.value = state.size;
     pbZoom.value = state.zoom;
+    pbBeauty.value = state.beautyAmount;
     promptText.style.fontSize = state.size + 'px';
     cameraVideo.style.setProperty('--zoom', state.zoom);
-    mirrorToggleBtn.classList.toggle('active', state.mirrorSave);
     zoomBtn.textContent = state.zoom.toFixed(1) + 'x';
     countdownBtn.textContent = state.countdown === 0 ? 'Off' : state.countdown + 's';
     countdownBtn.classList.toggle('active', state.countdown > 0);
-    beautyBtn.classList.toggle('active', state.beauty);
-    cameraVideo.classList.toggle('beauty', state.beauty);
+    beautyBtn.classList.toggle('active', state.beautyAmount > 0);
+    beautyOval.classList.toggle('on', state.beautyAmount > 0);
+    const beautyBlur = `blur(${state.beautyAmount}px)`;
+    beautyOval.style.backdropFilter = beautyBlur;
+    beautyOval.style.webkitBackdropFilter = beautyBlur;
     updateMainButtonIcon();
   }
 
@@ -502,30 +504,33 @@
 
   pbSpeed.addEventListener('input', () => { state.speed = +pbSpeed.value; syncUI(); saveSettings(); });
   pbSize.addEventListener('input', () => { state.size = +pbSize.value; syncUI(); saveSettings(); });
-  mirrorToggleBtn.addEventListener('click', () => { state.mirrorSave = !state.mirrorSave; syncUI(); saveSettings(); });
-  beautyBtn.addEventListener('click', () => { state.beauty = !state.beauty; syncUI(); saveSettings(); });
   countdownBtn.addEventListener('click', () => {
     const i = COUNTDOWN_OPTIONS.indexOf(state.countdown);
     state.countdown = COUNTDOWN_OPTIONS[(i + 1) % COUNTDOWN_OPTIONS.length];
     syncUI(); saveSettings();
   });
 
-  // ---------- zoom: tap to reveal a vertical slider, like a native camera app ----------
-  let zoomCloseTimer = null;
-  function scheduleZoomClose(){
-    clearTimeout(zoomCloseTimer);
-    zoomCloseTimer = setTimeout(() => zoomSliderPop.classList.remove('open'), 2500);
-  }
-  zoomBtn.addEventListener('click', () => {
-    zoomSliderPop.classList.toggle('open');
-    if(zoomSliderPop.classList.contains('open')) scheduleZoomClose();
-  });
-  pbZoom.addEventListener('input', () => { state.zoom = +pbZoom.value; syncUI(); saveSettings(); scheduleZoomClose(); });
-  document.addEventListener('pointerdown', (e) => {
-    if(zoomSliderPop.classList.contains('open') && !e.target.closest('#zoom-control')){
-      zoomSliderPop.classList.remove('open');
+  // ---------- zoom & beauty: tap to reveal a vertical slider, like a native camera app ----------
+  function setupVerticalSlider(btn, pop, onInput){
+    let closeTimer = null;
+    function scheduleClose(){
+      clearTimeout(closeTimer);
+      closeTimer = setTimeout(() => pop.classList.remove('open'), 2500);
     }
-  });
+    btn.addEventListener('click', () => {
+      pop.classList.toggle('open');
+      if(pop.classList.contains('open')) scheduleClose();
+    });
+    const input = pop.querySelector('input[type=range]');
+    input.addEventListener('input', () => { onInput(+input.value); scheduleClose(); });
+    document.addEventListener('pointerdown', (e) => {
+      if(pop.classList.contains('open') && !btn.parentElement.contains(e.target)){
+        pop.classList.remove('open');
+      }
+    });
+  }
+  setupVerticalSlider(zoomBtn, zoomSliderPop, (v) => { state.zoom = v; syncUI(); saveSettings(); });
+  setupVerticalSlider(beautyBtn, beautySliderPop, (v) => { state.beautyAmount = v; syncUI(); saveSettings(); });
 
   promptText.addEventListener('input', saveSettings);
 
@@ -748,26 +753,34 @@
     return { sx: (vw - cropW) / 2, sy: (vh - cropH) / 2, sw: cropW, sh: cropH };
   }
 
+  // Approximates "face only" without real face detection: a fixed oval
+  // roughly where a face sits in a typical selfie/teleprompter framing.
+  // Matches the position/size of the #beauty-oval element in the live
+  // preview (both derived the same way, as a fraction of frame width).
+  function beautyEllipseFor(w, h){
+    const rx = w * 0.23;
+    return { cx: w * 0.5, cy: h * 0.36, rx, ry: rx * 1.25 };
+  }
+
   function startDrawLoop(){
     if(drawRafId) return;
     function draw(){
       if(recordCtx && cameraVideo.videoWidth){
         const c = computeCoverCrop(cameraVideo.videoWidth, cameraVideo.videoHeight, recordCanvas.width / recordCanvas.height, state.zoom);
-        // Matches the CSS filter applied to the live preview, so the
-        // recorded file always looks like what was shown while recording.
-        recordCtx.filter = state.beauty ? BEAUTY_FILTER : 'none';
-        // Whether the front camera's raw track needs an extra horizontal
-        // flip to save correctly varies by device/browser and can't be
-        // reliably detected from code, so it's a user-toggled setting
-        // ("Specchia video salvato") instead of a hardcoded guess.
-        if(state.facingMode === 'user' && state.mirrorSave){
+        recordCtx.filter = 'none';
+        recordCtx.drawImage(cameraVideo, c.sx, c.sy, c.sw, c.sh, 0, 0, recordCanvas.width, recordCanvas.height);
+        // Blur-only (no brightness/contrast/saturation change) clipped to an
+        // oval, so the smoothing never touches color and never touches
+        // anything outside the face area.
+        if(state.beautyAmount > 0){
+          const e = beautyEllipseFor(recordCanvas.width, recordCanvas.height);
           recordCtx.save();
-          recordCtx.translate(recordCanvas.width, 0);
-          recordCtx.scale(-1, 1);
+          recordCtx.beginPath();
+          recordCtx.ellipse(e.cx, e.cy, e.rx, e.ry, 0, 0, Math.PI * 2);
+          recordCtx.clip();
+          recordCtx.filter = `blur(${state.beautyAmount}px)`;
           recordCtx.drawImage(cameraVideo, c.sx, c.sy, c.sw, c.sh, 0, 0, recordCanvas.width, recordCanvas.height);
           recordCtx.restore();
-        } else {
-          recordCtx.drawImage(cameraVideo, c.sx, c.sy, c.sw, c.sh, 0, 0, recordCanvas.width, recordCanvas.height);
         }
       }
       drawRafId = requestAnimationFrame(draw);
@@ -954,18 +967,11 @@
     lastTs = ts;
     const pxPerSec = speedToPxPerSec(state.speed);
     reader.scrollTop += pxPerSec * dt;
-    updateProgress();
     if(reader.scrollTop + reader.clientHeight >= reader.scrollHeight - 2){
       pause();
       return;
     }
     rafId = requestAnimationFrame(step);
-  }
-
-  function updateProgress(){
-    const max = reader.scrollHeight - reader.clientHeight;
-    const pct = max > 0 ? Math.min(100, (reader.scrollTop / max) * 100) : 0;
-    progressBar.style.width = pct + '%';
   }
 
   function updateMainButtonIcon(){
@@ -1028,13 +1034,6 @@
   }
   camRecordBtn.addEventListener('click', handleMainButton);
 
-  restartBtn.addEventListener('click', () => {
-    reader.scrollTop = 0;
-    updateProgress();
-  });
-
-  reader.addEventListener('scroll', updateProgress);
-
   // ---------- start / stop ----------
   async function startApp(){
     startOverlay.classList.add('hidden');
@@ -1042,7 +1041,6 @@
     resetBoxGeometry();
     await startCamera();
     reader.scrollTop = 0;
-    updateProgress();
   }
 
   function stopApp(){
