@@ -93,6 +93,9 @@
   #prompter-text[contenteditable="true"]{
     -webkit-user-select:text; user-select:text;
   }
+  @media (orientation: landscape){
+    #prompter-text{ text-align:center; }
+  }
 
   #box-header{
     position:absolute; top:0; left:0; right:0; height:32px;
@@ -239,6 +242,11 @@
   }
   .ctrl-row span.lbl{font-size:12px; color:var(--muted); width:46px; flex-shrink:0;}
   .ctrl-row input[type=range]{flex:1; min-width:0; accent-color:var(--accent); height:34px; margin:0;}
+  #mirror-toggle-btn{
+    flex:1; border:none; border-radius:8px; padding:8px 10px;
+    background:rgba(255,255,255,.12); color:var(--text); font-size:13px; font-weight:600; cursor:pointer;
+  }
+  #mirror-toggle-btn.active{ background:var(--accent); color:#161616; }
 
   /* ---------- start overlay ---------- */
   #start-overlay{
@@ -306,6 +314,10 @@
       <span class="lbl">Testo</span>
       <input type="range" id="pb-size" min="14" max="80" step="1" value="26">
     </div>
+    <div class="ctrl-row">
+      <span class="lbl">Salva</span>
+      <button id="mirror-toggle-btn" type="button">Specchia video salvato</button>
+    </div>
   </div>
 
   <div id="camera-bar">
@@ -360,6 +372,7 @@
 
   const switchCameraBtn = $('switch-camera-btn');
   const camRecordBtn = $('cam-record-btn');
+  const mirrorToggleBtn = $('mirror-toggle-btn');
 
   const saveBanner = $('save-banner');
   const saveDiscardBtn = $('save-discard-btn');
@@ -372,6 +385,7 @@
     facingMode: 'user',
     playing: false,
     recording: false,
+    mirrorSave: false,
   };
 
   // ---------- persistence ----------
@@ -385,6 +399,7 @@
       if(s.size) state.size = s.size;
       if(s.zoom) state.zoom = s.zoom;
       if(s.facingMode) state.facingMode = s.facingMode;
+      if(typeof s.mirrorSave === 'boolean') state.mirrorSave = s.mirrorSave;
       if(typeof s.text === 'string') promptText.innerText = s.text;
     }catch(e){}
   }
@@ -392,7 +407,7 @@
     try{
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
         speed: state.speed, size: state.size, zoom: state.zoom,
-        facingMode: state.facingMode,
+        facingMode: state.facingMode, mirrorSave: state.mirrorSave,
         text: promptText.innerText
       }));
     }catch(e){}
@@ -404,6 +419,7 @@
     pbZoom.value = state.zoom;
     promptText.style.fontSize = state.size + 'px';
     cameraVideo.style.setProperty('--zoom', state.zoom);
+    mirrorToggleBtn.classList.toggle('active', state.mirrorSave);
     updateMainButtonIcon();
   }
 
@@ -413,6 +429,7 @@
   pbSpeed.addEventListener('input', () => { state.speed = +pbSpeed.value; syncUI(); saveSettings(); });
   pbSize.addEventListener('input', () => { state.size = +pbSize.value; syncUI(); saveSettings(); });
   pbZoom.addEventListener('input', () => { state.zoom = +pbZoom.value; syncUI(); saveSettings(); });
+  mirrorToggleBtn.addEventListener('click', () => { state.mirrorSave = !state.mirrorSave; syncUI(); saveSettings(); });
 
   promptText.addEventListener('input', saveSettings);
 
@@ -640,12 +657,11 @@
     function draw(){
       if(recordCtx && cameraVideo.videoWidth){
         const c = computeCoverCrop(cameraVideo.videoWidth, cameraVideo.videoHeight, recordCanvas.width / recordCanvas.height, state.zoom);
-        // On several Android/Chrome devices the front camera's raw track is
-        // already mirrored at the source (not just via our CSS preview
-        // flip), so drawImage() picks up an already-mirrored frame even
-        // though it ignores CSS. Explicitly un-mirror the front camera here
-        // so the saved file is always correctly oriented.
-        if(state.facingMode === 'user'){
+        // Whether the front camera's raw track needs an extra horizontal
+        // flip to save correctly varies by device/browser and can't be
+        // reliably detected from code, so it's a user-toggled setting
+        // ("Specchia video salvato") instead of a hardcoded guess.
+        if(state.facingMode === 'user' && state.mirrorSave){
           recordCtx.save();
           recordCtx.translate(recordCanvas.width, 0);
           recordCtx.scale(-1, 1);
