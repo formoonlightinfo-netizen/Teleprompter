@@ -38,30 +38,24 @@
   #app{position:fixed; inset:0; overflow:hidden; background:#000;}
 
   /* ---------- CAMERA BACKGROUND ---------- */
+  /* The <video> itself is never shown: backdrop-filter over a live <video>
+     is unreliable on WebKit (the blur silently doesn't apply). The visible
+     background is a canvas we redraw every frame instead, which draws real
+     pixels (crop, zoom, face-oval blur) so it always works and always
+     matches exactly what gets recorded. */
   #camera-video{
-    position:absolute; inset:0;
-    width:100%; height:100%;
-    object-fit:cover;
-    background:#000;
-    transform:scale(var(--zoom, 1));
-    z-index:0;
-  }
-  #camera-video.mirror-preview{transform:scaleX(-1) scale(var(--zoom, 1));}
-  /* Only blurs what's visually behind this oval (no color/brightness change),
-     approximating "face only" without real face detection. Sized/positioned
-     to line up with the matching clipped blur drawn into the recording
-     canvas, so live preview and saved file match. */
-  #beauty-oval{
-    display:none;
     position:absolute;
-    left:50%; top:36%;
-    width:46vw; height:57.5vw;
-    transform:translate(-50%,-50%);
-    border-radius:50%;
-    z-index:1;
+    width:2px; height:2px;
+    opacity:0;
     pointer-events:none;
   }
-  #beauty-oval.on{ display:block; }
+  #view-canvas{
+    position:absolute; inset:0;
+    width:100%; height:100%;
+    background:#000;
+    z-index:0;
+  }
+  #view-canvas.mirror-preview{ transform:scaleX(-1); }
   .camera-dim{
     position:absolute; inset:0;
     background:rgba(0,0,0,.1);
@@ -326,7 +320,7 @@
 <div id="app">
 
   <video id="camera-video" playsinline autoplay muted></video>
-  <div id="beauty-oval"></div>
+  <canvas id="view-canvas"></canvas>
   <div class="camera-dim"></div>
 
   <div id="reader">
@@ -408,6 +402,8 @@
   const startBtn = $('start-btn');
 
   const cameraVideo = $('camera-video');
+  const viewCanvas = $('view-canvas');
+  const viewCtx = viewCanvas.getContext('2d');
   const reader = $('reader');
   const readerInner = $('reader-inner');
   const promptText = $('prompter-text');
@@ -433,7 +429,6 @@
   const countdownBtn = $('countdown-btn');
   const beautyBtn = $('beauty-btn');
   const beautySliderPop = $('beauty-slider-pop');
-  const beautyOval = $('beauty-oval');
   const countdownOverlay = $('countdown-overlay');
   const countdownNumber = $('countdown-number');
 
@@ -487,15 +482,10 @@
     pbZoom.value = state.zoom;
     pbBeauty.value = state.beautyAmount;
     promptText.style.fontSize = state.size + 'px';
-    cameraVideo.style.setProperty('--zoom', state.zoom);
     zoomBtn.textContent = state.zoom.toFixed(1) + 'x';
     countdownBtn.textContent = state.countdown === 0 ? 'Off' : state.countdown + 's';
     countdownBtn.classList.toggle('active', state.countdown > 0);
     beautyBtn.classList.toggle('active', state.beautyAmount > 0);
-    beautyOval.classList.toggle('on', state.beautyAmount > 0);
-    const beautyBlur = `blur(${state.beautyAmount}px)`;
-    beautyOval.style.backdropFilter = beautyBlur;
-    beautyOval.style.webkitBackdropFilter = beautyBlur;
     updateMainButtonIcon();
   }
 
@@ -714,10 +704,12 @@
         audio: true
       });
       cameraVideo.srcObject = cameraStream;
-      cameraVideo.classList.toggle('mirror-preview', state.facingMode === 'user');
+      viewCanvas.classList.toggle('mirror-preview', state.facingMode === 'user');
       await requestWidestZoom();
       await waitForVideoReady();
       setupRecordCanvas();
+      resizeViewCanvas();
+      startPreviewLoop();
       return true;
     }catch(e){
       alert('Impossibile accedere alla fotocamera o al microfono. Controlla i permessi del browser per questo sito.');
@@ -725,15 +717,16 @@
     }
   }
 
-  // ---------- record-time canvas pipeline ----------
-  // The camera's raw stream is displayed directly (mirrored for a natural
-  // selfie view), but what actually gets *recorded* is a canvas that we
-  // redraw every frame: cropped to the phone's current orientation (so the
-  // saved file is never the wrong shape) and always drawn un-mirrored (so
-  // the saved file always reads correctly, regardless of the mirrored
-  // preview). The zoom slider crops this same canvas draw, so what's
-  // recorded always matches what's on screen.
-  let recordCanvas = null, recordCtx = null, canvasStream = null, drawRafId = null;
+  // ---------- shared canvas draw pipeline (live preview + recording) ----------
+  // The live preview is drawn to a visible canvas every frame instead of
+  // shown via a plain <video>+CSS: backdrop-filter blur over a live <video>
+  // is unreliable on WebKit and silently does nothing, so both the on-screen
+  // preview and the recorded output are produced by the exact same drawing
+  // code (crop/zoom/face-oval blur), just onto two differently-sized
+  // canvases. This guarantees they always look identical and that the
+  // "skin smoothing" effect is actually visible while filming, not just
+  // (maybe) in the saved file.
+  let recordCanvas = null, recordCtx = null, canvasStream = null, previewRafId = null;
 
   function setupRecordCanvas(){
     const isPortrait = window.innerHeight >= window.innerWidth;
@@ -743,6 +736,12 @@
     }
     recordCanvas.width = isPortrait ? 720 : 1280;
     recordCanvas.height = isPortrait ? 1280 : 720;
+  }
+
+  function resizeViewCanvas(){
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    viewCanvas.width = Math.round(window.innerWidth * dpr);
+    viewCanvas.height = Math.round(window.innerHeight * dpr);
   }
 
   function computeCoverCrop(vw, vh, targetAspect, zoom){
@@ -755,40 +754,42 @@
 
   // Approximates "face only" without real face detection: a fixed oval
   // roughly where a face sits in a typical selfie/teleprompter framing.
-  // Matches the position/size of the #beauty-oval element in the live
-  // preview (both derived the same way, as a fraction of frame width).
   function beautyEllipseFor(w, h){
     const rx = w * 0.23;
     return { cx: w * 0.5, cy: h * 0.36, rx, ry: rx * 1.25 };
   }
 
-  function startDrawLoop(){
-    if(drawRafId) return;
-    function draw(){
-      if(recordCtx && cameraVideo.videoWidth){
-        const c = computeCoverCrop(cameraVideo.videoWidth, cameraVideo.videoHeight, recordCanvas.width / recordCanvas.height, state.zoom);
-        recordCtx.filter = 'none';
-        recordCtx.drawImage(cameraVideo, c.sx, c.sy, c.sw, c.sh, 0, 0, recordCanvas.width, recordCanvas.height);
-        // Blur-only (no brightness/contrast/saturation change) clipped to an
-        // oval, so the smoothing never touches color and never touches
-        // anything outside the face area.
-        if(state.beautyAmount > 0){
-          const e = beautyEllipseFor(recordCanvas.width, recordCanvas.height);
-          recordCtx.save();
-          recordCtx.beginPath();
-          recordCtx.ellipse(e.cx, e.cy, e.rx, e.ry, 0, 0, Math.PI * 2);
-          recordCtx.clip();
-          recordCtx.filter = `blur(${state.beautyAmount}px)`;
-          recordCtx.drawImage(cameraVideo, c.sx, c.sy, c.sw, c.sh, 0, 0, recordCanvas.width, recordCanvas.height);
-          recordCtx.restore();
-        }
-      }
-      drawRafId = requestAnimationFrame(draw);
+  function drawFrameToCanvas(ctx, canvas){
+    if(!cameraVideo.videoWidth) return;
+    const c = computeCoverCrop(cameraVideo.videoWidth, cameraVideo.videoHeight, canvas.width / canvas.height, state.zoom);
+    ctx.filter = 'none';
+    ctx.drawImage(cameraVideo, c.sx, c.sy, c.sw, c.sh, 0, 0, canvas.width, canvas.height);
+    // Blur-only (no brightness/contrast/saturation change) clipped to an
+    // oval, so the smoothing never touches color and never touches
+    // anything outside the face area.
+    if(state.beautyAmount > 0){
+      const e = beautyEllipseFor(canvas.width, canvas.height);
+      ctx.save();
+      ctx.beginPath();
+      ctx.ellipse(e.cx, e.cy, e.rx, e.ry, 0, 0, Math.PI * 2);
+      ctx.clip();
+      ctx.filter = `blur(${state.beautyAmount}px)`;
+      ctx.drawImage(cameraVideo, c.sx, c.sy, c.sw, c.sh, 0, 0, canvas.width, canvas.height);
+      ctx.restore();
     }
-    drawRafId = requestAnimationFrame(draw);
   }
-  function stopDrawLoop(){
-    if(drawRafId){ cancelAnimationFrame(drawRafId); drawRafId = null; }
+
+  function startPreviewLoop(){
+    if(previewRafId) return;
+    function tick(){
+      drawFrameToCanvas(viewCtx, viewCanvas);
+      if(state.recording && recordCtx) drawFrameToCanvas(recordCtx, recordCanvas);
+      previewRafId = requestAnimationFrame(tick);
+    }
+    previewRafId = requestAnimationFrame(tick);
+  }
+  function stopPreviewLoop(){
+    if(previewRafId){ cancelAnimationFrame(previewRafId); previewRafId = null; }
   }
 
   // some Android/Chrome cameras start already zoomed in past their widest
@@ -807,7 +808,7 @@
   }
 
   function stopCameraStream(){
-    stopDrawLoop();
+    stopPreviewLoop();
     if(cameraStream){
       cameraStream.getTracks().forEach((t) => t.stop());
       cameraStream = null;
@@ -824,6 +825,7 @@
   let orientationRestartTimer = null;
   window.addEventListener('resize', () => {
     if(!startOverlay.classList.contains('hidden')) return;
+    resizeViewCanvas();
     resetBoxGeometry();
     if(state.recording) return;
     clearTimeout(orientationRestartTimer);
@@ -867,9 +869,13 @@
     if(!cameraStream || !window.MediaRecorder || !recordCanvas) return;
     recordedChunks = [];
 
-    startDrawLoop();
-    if(!canvasStream) canvasStream = recordCanvas.captureStream(30);
-    canvasStream.getAudioTracks().forEach((t) => canvasStream.removeTrack(t));
+    // A fresh captureStream() (and thus a fresh video track) every time,
+    // rather than reusing one across recordings: some browsers leave a
+    // canvas capture track in a bad state once a previous MediaRecorder has
+    // finished consuming it, which silently produced zero data (and so no
+    // save banner) on a second recording.
+    if(canvasStream){ canvasStream.getTracks().forEach((t) => t.stop()); }
+    canvasStream = recordCanvas.captureStream(30);
     const audioTrack = cameraStream.getAudioTracks()[0];
     if(audioTrack) canvasStream.addTrack(audioTrack);
 
@@ -878,7 +884,6 @@
       mediaRecorder = mimeType ? new MediaRecorder(canvasStream, { mimeType }) : new MediaRecorder(canvasStream);
     }catch(e){
       alert('La registrazione video non è supportata su questo browser.');
-      stopDrawLoop();
       return;
     }
     mediaRecorder.ondataavailable = (e) => { if(e.data && e.data.size > 0) recordedChunks.push(e.data); };
@@ -897,7 +902,6 @@
 
   function stopRecording(){
     if(mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
-    stopDrawLoop();
     state.recording = false;
     recIndicator.classList.remove('on');
     updateMainButtonIcon();
