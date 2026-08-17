@@ -408,7 +408,6 @@
               <div class="qp-row">
                 <button type="button" data-group="quality" data-val="hd">HD</button>
                 <button type="button" data-group="quality" data-val="fhd">FHD</button>
-                <button type="button" data-group="quality" data-val="4k">4K</button>
               </div>
             </div>
             <div class="qp-group">
@@ -512,7 +511,7 @@
       if(s.zoom) state.zoom = s.zoom;
       if(s.facingMode) state.facingMode = s.facingMode;
       if(typeof s.countdown === 'number') state.countdown = s.countdown;
-      if(s.quality) state.quality = s.quality;
+      if(s.quality && QUALITY_LABEL[s.quality]) state.quality = s.quality;
       if(s.fps) state.fps = s.fps;
       if(typeof s.text === 'string') promptText.innerText = s.text;
     }catch(e){}
@@ -529,7 +528,7 @@
     }catch(e){}
   }
 
-  const QUALITY_LABEL = { hd: 'HD', fhd: 'FHD', '4k': '4K' };
+  const QUALITY_LABEL = { hd: 'HD', fhd: 'FHD' };
 
   function syncUI(){
     pbSpeed.value = state.speed;
@@ -760,7 +759,7 @@
   let recStartTs = null;
   let recTimerId = null;
 
-  const QUALITY_SHORT_EDGE = { hd: 720, fhd: 1080, '4k': 2160 };
+  const QUALITY_SHORT_EDGE = { hd: 720, fhd: 1080 };
 
   // No width/height/aspectRatio/frameRate constraints at all: requesting a
   // specific capture resolution pushes some phone cameras (notably iOS
@@ -835,12 +834,12 @@
     recordCanvas.height = isPortrait ? longEdge : shortEdge;
   }
 
-  // rough quality-appropriate bitrate so 4K/60fps doesn't get encoded
+  // rough quality-appropriate bitrate so FHD/60fps doesn't get encoded
   // at the same bitrate as HD/24fps
   function pickBitrate(){
     const pixels = recordCanvas.width * recordCanvas.height;
     const bits = pixels * state.fps * 0.07;
-    return Math.round(Math.min(Math.max(bits, 2_000_000), 45_000_000));
+    return Math.round(Math.min(Math.max(bits, 2_000_000), 16_000_000));
   }
 
   function resizeViewCanvas(){
